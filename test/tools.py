@@ -1,5 +1,6 @@
 import httplib
 import yaml
+import os
 
 def checkhost(url):
   cxn = httplib.HTTPConnection(url)
@@ -9,7 +10,8 @@ def checkhost(url):
   except httplib.socket.error:
     return False
 
-def getconfigs(path):
-  """Takes the path to app.yaml and returns the current app version number.
+def getconfigs(dir):
+  """Takes the path to the root app directory and returns the current app
+  configs as parsed by PyYaml.
   """
-  return yaml.load(open(path))
+  return yaml.load(open(os.path.join(dir, 'app.yaml')))
