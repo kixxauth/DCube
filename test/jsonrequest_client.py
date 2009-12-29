@@ -27,4 +27,4 @@ def post(url, send):
 
 def get(url):
   """Takes a full url and makes a GET request on it."""
-  return makeRequest(url, None)
+  return make_request(url, None)
