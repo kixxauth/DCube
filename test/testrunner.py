@@ -222,6 +222,44 @@ class UsersURL(unittest.TestCase):
 class CreateNewUser(unittest.TestCase):
   username = 'test_created_user0'
 
+  def test_noUserURL(self):
+    """create new user: username not included in url"""
+    cxn = httplib.HTTPConnection(HOST)
+
+    cxn.request('POST', URL_USERS,
+        createJSONRequest(method='put', creds=['foo_user']),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response['head']['message'],
+                     'access to url "/users/" is forbidden')
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
+  def test_usernameNotMatch(self):
+    """create new user: username does not match url"""
+    cxn = httplib.HTTPConnection(HOST)
+
+    cxn.request('POST', URL_USERS +'foo_bar',
+        createJSONRequest(method='put', creds=['foo_user']),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 400)
+    self.assertEqual(json_response['head']['message'],
+                     'username "foo_user" does not match url "/users/foo_bar"')
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
   def test_invalidUsername(self):
     """create new user: username contains invalid characters"""
     invalid_username = 'user$invalid '
@@ -246,24 +284,19 @@ class CreateNewUser(unittest.TestCase):
   def test_userDoesNotExist(self):
     """create new user: user does not exist -> created"""
     cxn = httplib.HTTPConnection(HOST)
-    cxn.request('POST', URL_USERS,
-        createJSONRequest(method='put', body={'username':self.username}),
+
+    cxn.request('POST', URL_USERS + self.username,
+        createJSONRequest(method='put', creds=[self.username]),
         JSONR_HEADERS)
 
     response = cxn.getresponse()
-
     self.assertEqual(response.status, 200)
-    checkHeaders(response.getheaders(),
-        defaultHeaders(content_length='94'))
 
-    data = simplejson.loads(response.read())
-    head = data.get('head')
-    assert head.get('status') == 201, \
-        'created new user should return status 201'
-    assert head.get('authorization') == [], \
-        'created new user should return authorization []'
-    assert data.get('body') == ('created user '+ self.username), \
-        'username should be returned as the body message'
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 201)
+    self.assertEqual(json_response['head']['message'],
+        'created user "username:'+ self.username +'"')
+    self.assertEqual(json_response.get('body'), None)
 
     cxn.close()
 
