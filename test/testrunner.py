@@ -183,6 +183,42 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
+  def test_invalidMethod(self):
+    """/users/: invalid method"""
+    cxn = httplib.HTTPConnection(HOST)
+
+    cxn.request('POST', URL_USERS,
+        createJSONRequest(method=1, creds=['foo_user']),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 405)
+    self.assertEqual(json_response['head']['message'], 'invalid method "1"')
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
+  def test_methodNotAllowed(self):
+    """/users/: method not allowed"""
+    cxn = httplib.HTTPConnection(HOST)
+
+    cxn.request('POST', URL_USERS,
+        createJSONRequest(method='post', creds=['foo_user']),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 405)
+    self.assertEqual(json_response['head']['message'], '"POST" method not allowed')
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
 class CreateNewUser(unittest.TestCase):
   username = 'test_created_user0'
 
