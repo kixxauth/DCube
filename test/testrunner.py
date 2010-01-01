@@ -62,9 +62,8 @@ def removeUser(username, passkey):
       ('removeUser() JR response status should be 401 not %d' %
           json_response['head']['status'])
 
-  nonce = json_response['head']['authorization'][1]
-  nextnonce = json_response['head']['authorization'][2]
-  creds = tools.createCredentials(username, passkey, nonce, nextnonce)
+  creds = tools.createCredentials(passkey,
+                                  *json_response['head']['authorization'])
 
   cxn.request('POST',
               URL_USERS + username,
@@ -366,6 +365,23 @@ class ExistingUser(unittest.TestCase):
     json_response = simplejson.loads(response.read())
     self.assertEqual(json_response['head']['status'], 401)
 
+    creds = tools.createCredentials(self.passkey,
+                                    *json_response['head']['authorization'])
+
+    cxn.request('POST',
+                URL_USERS + self.username,
+                createJSONRequest(method='get', creds=creds),
+                JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+                     {'username': self.username, 'groups': ['users']})
+
+    cxn.close()
+
   def test_putUser(self):
     """Put a user that already exists."""
     cxn = httplib.HTTPConnection(HOST)
@@ -380,10 +396,12 @@ class ExistingUser(unittest.TestCase):
     json_response = simplejson.loads(response.read())
     self.assertEqual(json_response['head']['status'], 401)
 
+    cxn.close()
+
   def test_deleteUser(self):
     """Delete a user"""
     creds = tools.createCredentials(
-        self.username, self.passkey, self.nonce, self.nextnonce)
+        self.passkey, self.username, self.nonce, self.nextnonce)
     cxn = httplib.HTTPConnection(HOST)
     cxn.request('POST', URL_USERS + self.username,
         createJSONRequest(method='delete',

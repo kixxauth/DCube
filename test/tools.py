@@ -29,7 +29,7 @@ def response(key):
 def juxt(passkey, seed):
   return str(passkey) + str(seed)
 
-def createCredentials(username, passkey, nonce, nextnonce):
+def createCredentials(passkey, username, nonce, nextnonce):
   """Takes passkey, nonce, nextnonce and returns a list;
   [username, cnonce, response]
   """
