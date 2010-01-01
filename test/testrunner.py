@@ -352,6 +352,20 @@ class ExistingUser(unittest.TestCase):
   def tearDown(self):
     removeUser(self.username, self.passkey)
 
+  def test_getUser(self):
+    """Try to get a user with no creds."""
+    cxn = httplib.HTTPConnection(HOST)
+    cxn.request('POST',
+                URL_USERS + self.username,
+                createJSONRequest(method='get',
+                                  creds=[self.username]),
+                JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 401)
+
   def test_putUser(self):
     """Put a user that already exists."""
     cxn = httplib.HTTPConnection(HOST)

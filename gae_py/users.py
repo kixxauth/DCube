@@ -23,6 +23,10 @@ def users_put_handler(this, storeFactory, user_url):
     this.message = 'created new user "%s"' % this.username
     this.authenticate = [this.username, nonce, nextnonce]
 
+def users_get_handler(this, storeFactory, user_url):
+  if this.userExists:
+    this.body = storeFactory('get_public_user')()
+
 def users_delete_handler(this, storeFactory, user_url):
   this.authenticate = []
   if this.userExists:
@@ -33,6 +37,7 @@ def users_delete_handler(this, storeFactory, user_url):
 def main():
   session.start([
     ('/users/(\w*)', {'PUT': ([users_base_handler, users_put_handler], True),
+                      'GET': ([users_base_handler, users_get_handler], True),
                       'DELETE': ([users_base_handler, users_delete_handler], True)})
     ])
 

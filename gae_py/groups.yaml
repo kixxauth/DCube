@@ -1,5 +1,7 @@
 create_new_user:
 - users
+get_public_user:
+- users
 delete_user:
 - users
 get_chap_user_creds:

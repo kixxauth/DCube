@@ -39,6 +39,14 @@ def create_new_user(username, groups):
 
   return createNewUser
 
+def get_public_user(username, groups):
+  def getPublicUser():
+    user = store.getBaseUser(username)
+    if user.nonce is None:
+      return None # user does not exist yet
+    return {'username': username, 'groups': user.groups}
+  return getPublicUser
+
 def delete_user(username, groups):
   def deleteUser():
     store.deleteBaseUser(username)
