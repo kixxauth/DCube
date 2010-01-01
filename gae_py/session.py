@@ -126,6 +126,7 @@ def start(url_mapping):
     chap_user['response'] = json_req['head']['authorization'][2]
   except:
     pass
+
   user_groups = gate.get_builder(
       username, ['ROOT'], 'get_user_groups')()
 
@@ -135,34 +136,42 @@ def start(url_mapping):
     match = re.match(regexp, webob_req.path)
     if match:
       handler = handlers.get(json_req['head']['method'])
+
+      # The handler object may be a tuple containing optional directives
+      allow_none_user = False
+      if isinstance(handler, tuple):
+        allow_none_user = handler[1]
+        handler = handler[0]
+
       if isinstance(handler, list):
-        logging.debug('Found handler for "%s" on %s',
-                      json_req['head']['method'],
-                      webob_req.path)
         url_groups = match.groups()
 
         auth_user = pychap.authenticate(gate.get_builder(
           username, ['ROOT'], 'update_chap_user_creds'), **chap_user)
 
         session = Session()
-        session.status = 200
-        session.message = 'ok'
-        session.authenticate = [username, auth_user.nonce, auth_user.nextnonce]
-        session.body = None
         session.username = username
         session.url = webob_req.path
-        # it's important to us chap_user here instead of auth_user since
-        # auth_user has a nonce and nextnonce generated for it by
-        # pychap.authenticate() even if the user does not exist
-        session.userExists = ((chap_user['nonce'] and chap_user['nextnonce']) and True or False)
+        session.userExists = (auth_user.message != pychap.USER_NA)
+        session.authenticate = [username, auth_user.nonce, auth_user.nextnonce]
+        session.body = None
 
-        def get_store_factory(interface):
-          return gate.get_builder(username,
-                               user_groups, interface)
+        if auth_user.authenticated or \
+            (not session.userExists and allow_none_user):
+          session.status = 200
+          session.message = 'ok'
 
-        for h in handler:
-          if not h(session, get_store_factory, *url_groups):
-            break
+          def get_store_factory(interface):
+            return gate.get_builder(username,
+                                 user_groups, interface)
+
+          for h in handler:
+            if not h(session, get_store_factory, *url_groups):
+              break
+
+        else:
+          session.status = 401
+          session.message = 'authenticate'
 
         startResponse()(createJSONResponse(status=session.status,
                                       message=session.message,
@@ -170,9 +179,6 @@ def start(url_mapping):
                                       body=session.body))
         return True
       else:
-        logging.debug('No handler for "%s" on %s',
-                      json_req['head']['method'],
-                      webob_req.path)
         startResponse()(createJSONResponse(status=405,
           message=('"%s" method not allowed' % json_req['head']['method'])))
         return False

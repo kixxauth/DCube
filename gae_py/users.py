@@ -32,8 +32,8 @@ def users_delete_handler(this, storeFactory, user_url):
 
 def main():
   session.start([
-    ('/users/(\w*)', {'PUT': [users_base_handler, users_put_handler],
-                      'DELETE': [users_base_handler, users_delete_handler]})
+    ('/users/(\w*)', {'PUT': ([users_base_handler, users_put_handler], True),
+                      'DELETE': ([users_base_handler, users_delete_handler], True)})
     ])
 
 if __name__ == '__main__':

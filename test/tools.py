@@ -18,7 +18,7 @@ def getconfigs(dir):
   return yaml.load(open(os.path.join(dir, 'app.yaml')))
 
 def hash(s):
-  return hashlib.md5(s).hexdigest()
+  return hashlib.sha1(s).hexdigest()
 
 def cnonce(key):
   return hash(hash(key))

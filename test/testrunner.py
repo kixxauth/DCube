@@ -58,6 +58,10 @@ def removeUser(username, passkey):
   if len(json_response['head']['authorization']) < 3:
     return
 
+  assert json_response['head']['status'] == 401, \
+      ('removeUser() JR response status should be 401 not %d' %
+          json_response['head']['status'])
+
   nonce = json_response['head']['authorization'][1]
   nextnonce = json_response['head']['authorization'][2]
   creds = tools.createCredentials(username, passkey, nonce, nextnonce)
@@ -69,14 +73,13 @@ def removeUser(username, passkey):
   response = cxn.getresponse()
   json_response = simplejson.loads(response.read())
   cxn.close()
-  assert (json_response['head']['status'] == 200 or
-      json_response['head']['status'] == 401), \
-      ('remove user JSONRequest response should be 201 or 401 not %d' %
+  assert json_response['head']['status'] == 200, \
+      ('removeUser() JR response status should be 200 not %d' %
           json_response['head']['status'])
-  assert json_response['head']['message'] == \
-      ('deleted user "%s"' % self.username), \
-      ('remove user JSONRequest response message should be (deleted user "%s")' %
-          self.username)
+  assert json_response['head']['message'] == ('deleted user "%s"' % username), \
+      ('remove user JSONRequest response message should be '
+          '(deleted user "%s") not (%s)' %
+          (username, json_response['head']['message']))
 
 def createUser(username):
   cxn = httplib.HTTPConnection(HOST)
@@ -382,6 +385,20 @@ class ExistingUser(unittest.TestCase):
 
   def tearDown(self):
     removeUser(self.username, self.passkey)
+
+  def test_putUser(self):
+    """Put a user that already exists."""
+    cxn = httplib.HTTPConnection(HOST)
+    cxn.request('POST',
+                URL_USERS + self.username,
+                createJSONRequest(method='put',
+                                  creds=[self.username]),
+                JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 401)
 
   def test_deleteUser(self):
     """Delete a user"""
