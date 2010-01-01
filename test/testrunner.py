@@ -342,40 +342,6 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
-class CreateNewUser(unittest.TestCase):
-  username = TEST_USER
-  passkey = TEST_PASSKEY
-
-  def setUp(self):
-    """Delete the test user to setUp the create user test."""
-    removeUser(self.username, self.passkey)
-
-  def tearDown(self):
-    """Delete the test user after the create user test."""
-    removeUser(self.username, self.passkey)
-
-  def test_createUser(self):
-    """create new user: user does not exist -> created"""
-    cxn = httplib.HTTPConnection(HOST)
-
-    cxn.request('POST', URL_USERS + self.username,
-        createJSONRequest(method='put', creds=[self.username]),
-        JSONR_HEADERS)
-
-    response = cxn.getresponse()
-    self.assertEqual(response.status, 200)
-
-    json_response = simplejson.loads(response.read())
-    self.assertEqual(json_response['head']['status'], 201)
-    self.assertEqual(json_response['head']['message'],
-        'created new user "'+ self.username +'"')
-    self.assertEqual(json_response['head']['authorization'][0], self.username)
-    self.assertEqual(len(json_response['head']['authorization'][1]), 40)
-    self.assertEqual(len(json_response['head']['authorization'][2]), 40)
-    self.assertEqual(json_response.get('body'), None)
-
-    cxn.close()
-
 class ExistingUser(unittest.TestCase):
   username = TEST_USER
   passkey = TEST_PASSKEY
@@ -428,6 +394,28 @@ class NoUser(unittest.TestCase):
   def setUp(self):
     """Delete the test user to setUp the create user test."""
     removeUser(self.username, self.passkey)
+
+  def test_createUser(self):
+    """create new user: user does not exist -> created"""
+    cxn = httplib.HTTPConnection(HOST)
+
+    cxn.request('POST', URL_USERS + self.username,
+        createJSONRequest(method='put', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 201)
+    self.assertEqual(json_response['head']['message'],
+        'created new user "'+ self.username +'"')
+    self.assertEqual(json_response['head']['authorization'][0], self.username)
+    self.assertEqual(len(json_response['head']['authorization'][1]), 40)
+    self.assertEqual(len(json_response['head']['authorization'][2]), 40)
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
 
   def test_delete(self):
     """Delete the non existing test user."""
