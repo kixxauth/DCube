@@ -1,0 +1,6 @@
+create_new_user:
+- users
+get_chap_user_creds:
+- ROOT
+get_user_groups:
+- ROOT

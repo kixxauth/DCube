@@ -1,6 +1,7 @@
+import os
+import hashlib
 import httplib
 import yaml
-import os
 
 def checkhost(url):
   cxn = httplib.HTTPConnection(url)
@@ -15,3 +16,23 @@ def getconfigs(dir):
   configs as parsed by PyYaml.
   """
   return yaml.load(open(os.path.join(dir, 'app.yaml')))
+
+def hash(s):
+  return hashlib.md5(s).hexdigest()
+
+def cnonce(key):
+  return hash(hash(key))
+
+def response(key):
+  return hash(key)
+
+def juxt(passkey, seed):
+  return str(passkey) + str(seed)
+
+def createCredentials(passkey, nonce, nextnonce):
+  """Takes passkey, nonce, nextnonce and returns a tuple;
+  passkey, cnonce, response
+  """
+  return (passkey,
+      cnonce(juxt(passkey, nextnonce)),
+      response(juxt(passkey, nonce)))

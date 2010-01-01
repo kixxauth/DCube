@@ -1,16 +1,20 @@
 #! /usr/bin/env python
+import unittest
+
 import os
 import sys
-import tools
 import httplib
-import unittest
 import simplejson
+
+import tools
 
 HOST = None
 LOCALHOST = None
 REMOTE_HOST = None
 
 URL_USERS = '/users/'
+
+TEST_USER = 'test_created_user0'
 
 JSONR_HEADERS = {
     'Content-Type': 'application/jsonrequest',
@@ -52,7 +56,7 @@ class RobotsTxt(unittest.TestCase):
            'Googlebot/2.1; +http://www.google.com/bot.html)')
 
     cxn = httplib.HTTPConnection(HOST)
-    cxn.request('GET', '/robots.txt', None, 
+    cxn.request('POST', '/robots.txt', None, 
         {'User-Agent': user_agent})
     response = cxn.getresponse()
 
@@ -67,7 +71,7 @@ class NotFound(unittest.TestCase):
   def testNotFound(self):
     """Check for not found response."""
     cxn = httplib.HTTPConnection(HOST)
-    cxn.request('GET', '/foo')
+    cxn.request('POST', '/foo')
     response = cxn.getresponse()
     self.assertEqual(response.status, 404)
     cxn.close()
@@ -83,7 +87,7 @@ class UsersURL(unittest.TestCase):
   def test_invalidURL(self):
     """invalid users url"""
     cxn = httplib.HTTPConnection(HOST)
-    cxn.request('GET', '/users')
+    cxn.request('POST', '/users')
     self.assertEqual(cxn.getresponse().status, 404)
     cxn.close()
 
@@ -99,7 +103,7 @@ class UsersURL(unittest.TestCase):
     content_type = 'application/x-www-form-urlencoded'
     headers = JSONR_HEADERS
     headers['Content-Type'] = content_type
-    cxn.request('GET', URL_USERS, None, headers)
+    cxn.request('POST', URL_USERS, None, headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 400)
     self.assertEqual(response.read(),
@@ -169,7 +173,7 @@ class UsersURL(unittest.TestCase):
     """/users/: invalid username authentication creds"""
     cxn = httplib.HTTPConnection(HOST)
 
-    cxn.request('GET', URL_USERS,
+    cxn.request('POST', URL_USERS,
         createJSONRequest(method='get', creds=[None]),
         JSONR_HEADERS)
 
@@ -220,7 +224,7 @@ class UsersURL(unittest.TestCase):
     cxn.close()
 
 class CreateNewUser(unittest.TestCase):
-  username = 'test_created_user0'
+  username = TEST_USER
 
   def test_noUserURL(self):
     """create new user: username not included in url"""
@@ -266,7 +270,7 @@ class CreateNewUser(unittest.TestCase):
 
     cxn = httplib.HTTPConnection(HOST)
 
-    cxn.request('GET', URL_USERS,
+    cxn.request('POST', URL_USERS,
         createJSONRequest(method='get', creds=[invalid_username]),
         JSONR_HEADERS)
 
@@ -295,7 +299,50 @@ class CreateNewUser(unittest.TestCase):
     json_response = simplejson.loads(response.read())
     self.assertEqual(json_response['head']['status'], 201)
     self.assertEqual(json_response['head']['message'],
+        'created new user "'+ self.username +'"')
+    self.assertEqual(json_response['head']['authorization'][0], self.username)
+    self.assertEqual(len(json_response['head']['authorization'][1]), 40)
+    self.assertEqual(len(json_response['head']['authorization'][2]), 40)
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
+class DeleteUser_exists(unittest.TestCase):
+  username = TEST_USER
+
+  def setup(self):
+    cxn = httplib.HTTPConnection(HOST)
+    cxn.request('POST', URL_USERS + self.username,
+        createJSONRequest(method='put', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 201)
+    self.assertEqual(json_response['head']['message'],
         'created user "username:'+ self.username +'"')
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
+  def test_deleteUser(self):
+    """Delete a user"""
+    cxn = httplib.HTTPConnection(HOST)
+    cxn.request('POST', URL_USERS + self.username,
+        createJSONRequest(method='delete', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
+    self.assertEqual(json_response['head']['authorization'][0], self.username)
+    self.assertEqual(len(json_response['head']['authorization'][1]), 12)
+    self.assertEqual(len(json_response['head']['authorization'][2]), 12)
     self.assertEqual(json_response.get('body'), None)
 
     cxn.close()
