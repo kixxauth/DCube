@@ -10,12 +10,10 @@ from google.appengine.ext.webapp import util
 from django.utils import simplejson
 
 import gate
+import pychap
 
 class Session():
   pass
-
-def store_factory(groups, interface):
-  return gate.get_builder(groups, interface)
 
 def createJSONResponse(status=200, message='ok', creds=[], body=None):
   return simplejson.dumps(dict(
@@ -103,24 +101,33 @@ def start(url_mapping):
     return False
 
   # check the username
-  if not isinstance(json_req['head']['authorization'][0], basestring):
+  username = json_req['head']['authorization'][0]
+  if not isinstance(username, basestring):
     startResponse()(createJSONResponse(status=401,
                message=('invalid username "%s"' % \
-                   json_req['head']['authorization'][0])))
+                   username)))
     return False
 
-  if re.search('\W', json_req['head']['authorization'][0]):
+  if re.search('\W', username):
     startResponse()(createJSONResponse(status=401,
                message=('invalid username "%s"' % \
-                   json_req['head']['authorization'][0])))
+                   username)))
     return False
 
-  chap_user = store_factory(
-      ['ROOT'], 'get_chap_user_creds')(
-          json_req['head']['authorization'][0])
-  user_groups = store_factory(
-      ['ROOT'], 'get_user_groups')(
-          json_req['head']['authorization'][0])
+  chap_user = gate.get_builder(
+      username, ['ROOT'], 'get_chap_user_creds')()
+  chap_user['cnonce'] = None
+  chap_user['response'] = None
+  try:
+    chap_user['cnonce'] = json_req['head']['authorization'][1]
+  except:
+    pass
+  try:
+    chap_user['response'] = json_req['head']['authorization'][2]
+  except:
+    pass
+  user_groups = gate.get_builder(
+      username, ['ROOT'], 'get_user_groups')()
 
   handler = None
   url_groups = ()
@@ -128,22 +135,34 @@ def start(url_mapping):
     match = re.match(regexp, webob_req.path)
     if match:
       handler = handlers.get(json_req['head']['method'])
-      if callable(handler):
+      if isinstance(handler, list):
+        logging.debug('Found handler for "%s" on %s',
+                      json_req['head']['method'],
+                      webob_req.path)
         url_groups = match.groups()
+
+        auth_user = pychap.authenticate(gate.get_builder(
+          username, ['ROOT'], 'update_chap_user_creds'), **chap_user)
 
         session = Session()
         session.status = 200
         session.message = 'ok'
-        session.authenticate = []
+        session.authenticate = [username, auth_user.nonce, auth_user.nextnonce]
         session.body = None
-        session.username = json_req['head']['authorization'][0]
+        session.username = username
         session.url = webob_req.path
-        session.userExists = chap_user.exists
+        # it's important to us chap_user here instead of auth_user since
+        # auth_user has a nonce and nextnonce generated for it by
+        # pychap.authenticate() even if the user does not exist
+        session.userExists = ((chap_user['nonce'] and chap_user['nextnonce']) and True or False)
 
         def get_store_factory(interface):
-          return store_factory(user_groups, interface)
+          return gate.get_builder(username,
+                               user_groups, interface)
 
-        handler(session, get_store_factory, *url_groups)
+        for h in handler:
+          if not h(session, get_store_factory, *url_groups):
+            break
 
         startResponse()(createJSONResponse(status=session.status,
                                       message=session.message,
@@ -151,6 +170,9 @@ def start(url_mapping):
                                       body=session.body))
         return True
       else:
+        logging.debug('No handler for "%s" on %s',
+                      json_req['head']['method'],
+                      webob_req.path)
         startResponse()(createJSONResponse(status=405,
           message=('"%s" method not allowed' % json_req['head']['method'])))
         return False

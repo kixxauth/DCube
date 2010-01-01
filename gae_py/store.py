@@ -1,5 +1,7 @@
 from google.appengine.ext import db
 
+import logging
+
 class BaseUserPrototype():
   def __init__(self):
     self.nonce = None
@@ -41,10 +43,10 @@ class BaseUser(db.Model):
   # level 0 group by defualt
   groups = db.StringListProperty(default=['users'])
 
+# todo: this should hit memcached first
 def getBaseUser(username):
   user = BaseUser.get_by_key_name('username:%s' % username) or \
       BaseUserPrototype()
-  user.exists = isinstance(user, BaseUser)
   return user
 
 def putBaseUser(*a, **k):
@@ -55,3 +57,6 @@ def putBaseUser(*a, **k):
   ent.passkey = k.get('passkey') or ent.passkey
   ent.groups = k.get('groups') or ent.groups
   ent.put()
+
+def deleteBaseUser(username):
+  BaseUser.get_by_key_name('username:%s' % username).delete()

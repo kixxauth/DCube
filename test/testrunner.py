@@ -15,6 +15,7 @@ REMOTE_HOST = None
 URL_USERS = '/users/'
 
 TEST_USER = 'test_created_user0'
+TEST_PASSKEY = 'pk'
 
 JSONR_HEADERS = {
     'Content-Type': 'application/jsonrequest',
@@ -43,6 +44,55 @@ def checkHeaders(headers, expected):
       continue
     assert (val == expected.get(name)), \
         ('header %s: %s is not %s' % (name, val, expected.get(name)))
+
+def removeUser(username, passkey):
+  cxn = httplib.HTTPConnection(HOST)
+  cxn.request('POST', URL_USERS + username,
+      createJSONRequest(method='delete',
+                        creds=[username]),
+                        JSONR_HEADERS)
+  response = cxn.getresponse()
+  json_response = simplejson.loads(response.read())
+
+  # user does not exist
+  if len(json_response['head']['authorization']) < 3:
+    return
+
+  cxn.request('POST',
+              URL_USERS + username,
+              createJSONRequest(
+                method='delete',
+                creds=list(
+                  tools.createCredentials(
+                    passkey,
+                    json_response['head']['authorization'][1],
+                    json_response['head']['authorization'][2]))),
+              JSONR_HEADERS)
+  response = cxn.getresponse()
+  json_response = simplejson.loads(response.read())
+  cxn.close()
+  assert json_response['head']['status'] is 200, \
+      'remove user JSONRequest response status should be 200'
+  assert json_response['head']['message'] == \
+      ('deleted user "%s"' % self.username), \
+      ('remove user JSONRequest response message should be (deleted user "%s")' %
+          self.username)
+
+def createUser(username):
+  cxn = httplib.HTTPConnection(HOST)
+  cxn.request('POST', URL_USERS + username,
+      createJSONRequest(method='put', creds=[username]),
+      JSONR_HEADERS)
+
+  response = cxn.getresponse()
+  assert response.status is 200, 'create user http response should be 200'
+
+  json_response = simplejson.loads(response.read())
+  cxn.close()
+  assert json_response['head']['status'] is 201, \
+      'create user JSONRequest response should be 201'
+  return (json_response['head']['authorization'][1],
+      json_response['head']['authorization'][2])
 
 class CheckHost(unittest.TestCase):
   def testHost(self):
@@ -187,6 +237,27 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
+  def test_invalidUsernameChars(self):
+    """/users/: username contains invalid characters"""
+    invalid_username = 'user$invalid '
+
+    cxn = httplib.HTTPConnection(HOST)
+
+    cxn.request('POST', URL_USERS,
+        createJSONRequest(method='get', creds=[invalid_username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'],
+                     'invalid username "'+ invalid_username +'"')
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
+
   def test_invalidMethod(self):
     """/users/: invalid method"""
     cxn = httplib.HTTPConnection(HOST)
@@ -223,11 +294,8 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
-class CreateNewUser(unittest.TestCase):
-  username = TEST_USER
-
   def test_noUserURL(self):
-    """create new user: username not included in url"""
+    """/users/: username not included in url"""
     cxn = httplib.HTTPConnection(HOST)
 
     cxn.request('POST', URL_USERS,
@@ -246,7 +314,7 @@ class CreateNewUser(unittest.TestCase):
     cxn.close()
 
   def test_usernameNotMatch(self):
-    """create new user: username does not match url"""
+    """/users/: username does not match url"""
     cxn = httplib.HTTPConnection(HOST)
 
     cxn.request('POST', URL_USERS +'foo_bar',
@@ -264,28 +332,19 @@ class CreateNewUser(unittest.TestCase):
 
     cxn.close()
 
-  def test_invalidUsername(self):
-    """create new user: username contains invalid characters"""
-    invalid_username = 'user$invalid '
+class CreateNewUser(unittest.TestCase):
+  username = TEST_USER
+  passkey = TEST_PASSKEY
 
-    cxn = httplib.HTTPConnection(HOST)
+  def setUp(self):
+    """Delete the test user to setUp the create user test."""
+    removeUser(self.username, self.passkey)
 
-    cxn.request('POST', URL_USERS,
-        createJSONRequest(method='get', creds=[invalid_username]),
-        JSONR_HEADERS)
+  def tearDown(self):
+    """Delete the test user after the create user test."""
+    removeUser(self.username, self.passkey)
 
-    response = cxn.getresponse()
-    self.assertEqual(response.status, 200)
-
-    json_response = simplejson.loads(response.read())
-    self.assertEqual(json_response['head']['status'], 401)
-    self.assertEqual(json_response['head']['message'],
-                     'invalid username "'+ invalid_username +'"')
-    self.assertEqual(json_response.get('body'), None)
-
-    cxn.close()
-
-  def test_userDoesNotExist(self):
+  def test_createUser(self):
     """create new user: user does not exist -> created"""
     cxn = httplib.HTTPConnection(HOST)
 
@@ -307,45 +366,59 @@ class CreateNewUser(unittest.TestCase):
 
     cxn.close()
 
-class DeleteUser_exists(unittest.TestCase):
+class ExistingUser(unittest.TestCase):
   username = TEST_USER
+  passkey = TEST_PASSKEY
 
-  def setup(self):
-    cxn = httplib.HTTPConnection(HOST)
-    cxn.request('POST', URL_USERS + self.username,
-        createJSONRequest(method='put', creds=[self.username]),
-        JSONR_HEADERS)
+  def setUp(self):
+    self.nonce, self.nextnonce = createUser(self.username)
 
-    response = cxn.getresponse()
-    self.assertEqual(response.status, 200)
-
-    json_response = simplejson.loads(response.read())
-    self.assertEqual(json_response['head']['status'], 201)
-    self.assertEqual(json_response['head']['message'],
-        'created user "username:'+ self.username +'"')
-    self.assertEqual(json_response.get('body'), None)
-
-    cxn.close()
+  def tearDown(self):
+    removeUser(self.username, self.passkey)
 
   def test_deleteUser(self):
     """Delete a user"""
+    pk, cnonce, response = tools.createCredentials(
+        self.passkey, self.nonce, self.nextnonce)
     cxn = httplib.HTTPConnection(HOST)
     cxn.request('POST', URL_USERS + self.username,
-        createJSONRequest(method='delete', creds=[self.username]),
-        JSONR_HEADERS)
+        createJSONRequest(method='delete',
+                          creds=[self.username, cnonce, response]),
+                          JSONR_HEADERS)
 
     response = cxn.getresponse()
     self.assertEqual(response.status, 200)
 
     json_response = simplejson.loads(response.read())
-    self.assertEqual(json_response['head']['status'], 401)
-    self.assertEqual(json_response['head']['message'], 'authenticate')
-    self.assertEqual(json_response['head']['authorization'][0], self.username)
-    self.assertEqual(len(json_response['head']['authorization'][1]), 12)
-    self.assertEqual(len(json_response['head']['authorization'][2]), 12)
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response['head']['message'], 'deleted user "%s"' % self.username)
+    self.assertEqual(len(json_response['head']['authorization']), 0)
     self.assertEqual(json_response.get('body'), None)
 
     cxn.close()
+
+class NoUser(unittest.TestCase):
+  username = TEST_USER
+  passkey = TEST_PASSKEY
+
+  def setUp(self):
+    """Delete the test user to setUp the create user test."""
+    removeUser(self.username, self.passkey)
+
+  def test_delete(self):
+    """Delete the non existing test user."""
+    cxn = httplib.HTTPConnection(HOST)
+    cxn.request('POST', URL_USERS + self.username,
+        createJSONRequest(method='delete',
+                          creds=[self.username]),
+                          JSONR_HEADERS)
+    response = cxn.getresponse()
+    json_response = simplejson.loads(response.read())
+    cxn.close()
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response['head']['message'], 'deleted user "%s"' % self.username)
+    self.assertEqual(len(json_response['head']['authorization']), 0)
 
 def main():
   global HOST
