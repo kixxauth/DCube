@@ -28,6 +28,10 @@ def users_put_handler(this, storeFactory, user_url):
 def users_get_handler(this, storeFactory, user_url):
   if this.userExists:
     this.body = storeFactory('get_public_user')()
+  else:
+    this.status = 404
+    this.message = 'user "%s" not found' % this.username
+    this.authenticate = []
 
 def users_delete_handler(this, storeFactory, user_url):
   this.authenticate = []

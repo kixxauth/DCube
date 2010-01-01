@@ -522,7 +522,23 @@ class NoUser(unittest.TestCase):
 
     cxn.close()
 
-  def test_delete(self):
+  def test_getUser(self):
+    """Try getting a non existing user."""
+    cxn = httplib.HTTPConnection(HOST)
+    cxn.request('POST', URL_USERS + self.username,
+        createJSONRequest(method='get',
+                          creds=[self.username]),
+                          JSONR_HEADERS)
+    response = cxn.getresponse()
+    json_response = simplejson.loads(response.read())
+    cxn.close()
+
+    self.assertEqual(json_response['head']['status'], 404)
+    self.assertEqual(json_response['head']['message'],
+                     'user "%s" not found' % self.username)
+    self.assertEqual(len(json_response['head']['authorization']), 0)
+
+  def test_deleteUser(self):
     """Delete the non existing test user."""
     cxn = httplib.HTTPConnection(HOST)
     cxn.request('POST', URL_USERS + self.username,
