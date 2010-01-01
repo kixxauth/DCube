@@ -396,6 +396,21 @@ class ExistingUser(unittest.TestCase):
     json_response = simplejson.loads(response.read())
     self.assertEqual(json_response['head']['status'], 401)
 
+    creds = tools.createCredentials(self.passkey,
+                                    *json_response['head']['authorization'])
+
+    cxn.request('POST',
+                URL_USERS + self.username,
+                createJSONRequest(method='put', creds=creds),
+                JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+                     {'username': self.username, 'groups': ['users']})
+
     cxn.close()
 
   def test_deleteUser(self):
@@ -445,7 +460,8 @@ class NoUser(unittest.TestCase):
     self.assertEqual(json_response['head']['authorization'][0], self.username)
     self.assertEqual(len(json_response['head']['authorization'][1]), 40)
     self.assertEqual(len(json_response['head']['authorization'][2]), 40)
-    self.assertEqual(json_response.get('body'), None)
+    self.assertEqual(json_response.get('body'),
+                     {'username': self.username, 'groups': ['users']})
 
     cxn.close()
 

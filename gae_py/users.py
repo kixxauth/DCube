@@ -23,6 +23,8 @@ def users_put_handler(this, storeFactory, user_url):
     this.message = 'created new user "%s"' % this.username
     this.authenticate = [this.username, nonce, nextnonce]
 
+  this.body = storeFactory('get_public_user')()
+
 def users_get_handler(this, storeFactory, user_url):
   if this.userExists:
     this.body = storeFactory('get_public_user')()
