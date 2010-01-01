@@ -58,21 +58,21 @@ def removeUser(username, passkey):
   if len(json_response['head']['authorization']) < 3:
     return
 
+  nonce = json_response['head']['authorization'][1]
+  nextnonce = json_response['head']['authorization'][2]
+  creds = tools.createCredentials(username, passkey, nonce, nextnonce)
+
   cxn.request('POST',
               URL_USERS + username,
-              createJSONRequest(
-                method='delete',
-                creds=list(
-                  tools.createCredentials(
-                    passkey,
-                    json_response['head']['authorization'][1],
-                    json_response['head']['authorization'][2]))),
+              createJSONRequest(method='delete', creds=creds),
               JSONR_HEADERS)
   response = cxn.getresponse()
   json_response = simplejson.loads(response.read())
   cxn.close()
-  assert json_response['head']['status'] is 200, \
-      'remove user JSONRequest response status should be 200'
+  assert (json_response['head']['status'] == 200 or
+      json_response['head']['status'] == 401), \
+      ('remove user JSONRequest response should be 201 or 401 not %d' %
+          json_response['head']['status'])
   assert json_response['head']['message'] == \
       ('deleted user "%s"' % self.username), \
       ('remove user JSONRequest response message should be (deleted user "%s")' %
@@ -89,8 +89,10 @@ def createUser(username):
 
   json_response = simplejson.loads(response.read())
   cxn.close()
-  assert json_response['head']['status'] is 201, \
-      'create user JSONRequest response should be 201'
+  assert (json_response['head']['status'] == 201 or
+      json_response['head']['status'] == 401), \
+      ('create user JSONRequest response should be 201 or 401 not %d' %
+          json_response['head']['status'])
   return (json_response['head']['authorization'][1],
       json_response['head']['authorization'][2])
 
@@ -127,6 +129,8 @@ class NotFound(unittest.TestCase):
     cxn.close()
 
 class UsersURL(unittest.TestCase):
+  username = TEST_USER
+
   def setUp(self):
     global JSONR_HEADERS
     JSONR_HEADERS = {
@@ -294,12 +298,13 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
+  # todo: add test for get method
   def test_noUserURL(self):
     """/users/: username not included in url"""
     cxn = httplib.HTTPConnection(HOST)
 
     cxn.request('POST', URL_USERS,
-        createJSONRequest(method='put', creds=['foo_user']),
+        createJSONRequest(method='put', creds=[self.username]),
         JSONR_HEADERS)
 
     response = cxn.getresponse()
@@ -313,12 +318,13 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
+  # todo: add test for get method
   def test_usernameNotMatch(self):
     """/users/: username does not match url"""
     cxn = httplib.HTTPConnection(HOST)
 
     cxn.request('POST', URL_USERS +'foo_bar',
-        createJSONRequest(method='put', creds=['foo_user']),
+        createJSONRequest(method='put', creds=[self.username]),
         JSONR_HEADERS)
 
     response = cxn.getresponse()
@@ -327,7 +333,8 @@ class UsersURL(unittest.TestCase):
     json_response = simplejson.loads(response.read())
     self.assertEqual(json_response['head']['status'], 400)
     self.assertEqual(json_response['head']['message'],
-                     'username "foo_user" does not match url "/users/foo_bar"')
+                     ('username "%s" does not match url "/users/foo_bar"' %
+                       self.username))
     self.assertEqual(json_response.get('body'), None)
 
     cxn.close()
@@ -378,12 +385,12 @@ class ExistingUser(unittest.TestCase):
 
   def test_deleteUser(self):
     """Delete a user"""
-    pk, cnonce, response = tools.createCredentials(
-        self.passkey, self.nonce, self.nextnonce)
+    creds = tools.createCredentials(
+        self.username, self.passkey, self.nonce, self.nextnonce)
     cxn = httplib.HTTPConnection(HOST)
     cxn.request('POST', URL_USERS + self.username,
         createJSONRequest(method='delete',
-                          creds=[self.username, cnonce, response]),
+                          creds=creds),
                           JSONR_HEADERS)
 
     response = cxn.getresponse()
