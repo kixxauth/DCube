@@ -305,8 +305,37 @@ class UsersURL(unittest.TestCase):
     """/users/: username not included in url"""
     cxn = httplib.HTTPConnection(HOST)
 
+    #put
     cxn.request('POST', URL_USERS,
         createJSONRequest(method='put', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response['head']['message'],
+                     'access to url "/users/" is forbidden')
+    self.assertEqual(json_response.get('body'), None)
+
+    #get
+    cxn.request('POST', URL_USERS,
+        createJSONRequest(method='get', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response['head']['message'],
+                     'access to url "/users/" is forbidden')
+    self.assertEqual(json_response.get('body'), None)
+
+    #delete
+    cxn.request('POST', URL_USERS,
+        createJSONRequest(method='delete', creds=[self.username]),
         JSONR_HEADERS)
 
     response = cxn.getresponse()
@@ -327,6 +356,34 @@ class UsersURL(unittest.TestCase):
 
     cxn.request('POST', URL_USERS +'foo_bar',
         createJSONRequest(method='put', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 400)
+    self.assertEqual(json_response['head']['message'],
+                     ('username "%s" does not match url "/users/foo_bar"' %
+                       self.username))
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.request('POST', URL_USERS +'foo_bar',
+        createJSONRequest(method='get', creds=[self.username]),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 400)
+    self.assertEqual(json_response['head']['message'],
+                     ('username "%s" does not match url "/users/foo_bar"' %
+                       self.username))
+    self.assertEqual(json_response.get('body'), None)
+
+    cxn.request('POST', URL_USERS +'foo_bar',
+        createJSONRequest(method='delete', creds=[self.username]),
         JSONR_HEADERS)
 
     response = cxn.getresponse()
