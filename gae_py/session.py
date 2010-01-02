@@ -20,11 +20,11 @@ def createJSONResponse(status=200, message='ok', creds=[], body=None):
       head=dict(status=status, message=message, authorization=creds),
       body=body))
 
-def startResponse(status=200):
+def startResponse(status=200, content_type='application/jsonrequest'):
   return util._start_response(
       ('%d %s' %
         (status, webapp.Response.http_status_message(status))),
-      [('Content-Type', 'application/jsonrequest'), ('expires', '-1')])
+      [('Content-Type', content_type), ('expires', '-1')])
 
 def start(url_mapping):
   env = dict(os.environ)
@@ -183,4 +183,5 @@ def start(url_mapping):
           message=('"%s" method not allowed' % json_req['head']['method'])))
         return False
 
-  startResponse(status=404)('the url "%s" could not be found on this host.' % webob_req.path)
+  startResponse(status=404, content_type='text/plain')(
+      'the url "%s" could not be found on this host.' % webob_req.path)

@@ -1,13 +1,8 @@
 import httplib
 import simplejson
 
-JSONR_HEADERS = {
-    'Content-Type': 'application/jsonrequest',
-    'Accept': 'application/jsonrequest',
-    'User-Agent': 'testing_client'}
-
-HOST = ''
-LOCALHOST = ''
+HOST = 'localhost'
+LOCALHOST = 'localhost'
 
 def set_HOST(val):
   global HOST
@@ -16,6 +11,12 @@ def set_HOST(val):
 def set_LOCALHOST(val):
   global LOCALHOST
   LOCALHOST = val
+
+def getJSONRequestHeaders():
+  return {
+    'Content-Type': 'application/jsonrequest',
+    'Accept': 'application/jsonrequest',
+    'User-Agent': 'testing_client'}
 
 def httpConnection():
   return httplib.HTTPConnection(HOST)
@@ -56,4 +57,5 @@ def createJSONRequest(method='get', creds=[], body=None):
 def makeJSONRequest_for_httplib(url='/', method='get', creds=[], body=None):
   """return a tuple that can be unpacked as the arguments to
   httplib.Connection().request()"""
-  return ('POST', url, createJSONRequest(method, creds, body), JSONR_HEADERS)
+  return ('POST', url,
+      createJSONRequest(method, creds, body), getJSONRequestHeaders())
