@@ -7,9 +7,6 @@ handlers:
 - url: /robots.txt
   script: robots.py
 
-- url: /users/.*
-  script: users.py
-
 - url: /environs
   script: environs.py
 
