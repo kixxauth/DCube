@@ -125,7 +125,10 @@ class NotFound(unittest.TestCase):
   def testNotFound(self):
     """Check for not found response."""
     cxn = httplib.HTTPConnection(HOST)
-    cxn.request('POST', '/foo')
+    cxn.request('POST', '/foo',
+        createJSONRequest(method='get', creds=['foo_man']),
+        JSONR_HEADERS)
+
     response = cxn.getresponse()
     self.assertEqual(response.status, 404)
     cxn.close()
@@ -143,8 +146,12 @@ class UsersURL(unittest.TestCase):
   def test_invalidURL(self):
     """invalid users url"""
     cxn = httplib.HTTPConnection(HOST)
-    cxn.request('POST', '/users')
-    self.assertEqual(cxn.getresponse().status, 404)
+    cxn.request('POST', '/users',
+        createJSONRequest(method='get', creds=['foo_man']),
+        JSONR_HEADERS)
+
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 404)
     cxn.close()
 
   def test_invalidMethod(self):
