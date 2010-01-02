@@ -87,8 +87,9 @@ def start(url_mapping):
       json_req['head'] or {'method': 'GET', 'authorization': []})
 
   if not isinstance(head.get('method'), basestring):
+    method = (head.get('method') is None) and 'null' or head.get('method')
     startResponse()(createJSONResponse(status=405,
-      message=('invalid method "%s"' % head.get('method'))))
+      message=('invalid method "%s"' % method)))
     return False
 
   json_req = dict(head={'method': head['method'].upper(),
@@ -103,6 +104,7 @@ def start(url_mapping):
   # check the username
   username = json_req['head']['authorization'][0]
   if not isinstance(username, basestring):
+    username = (username is None) and 'null' or username 
     startResponse()(createJSONResponse(status=401,
                message=('invalid username "%s"' % \
                    username)))

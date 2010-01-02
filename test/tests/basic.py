@@ -110,3 +110,39 @@ class JSONRequest(unittest.TestCase):
     self.assertEqual(json_response.get('body'), None)
 
     cxn.close()
+
+  def test_invalids(self):
+    """JSONRequest no user authentication creds"""
+    cxn = tests.httpConnection()
+    headers = tests.getJSONRequestHeaders()
+
+    invalids = [('{"head":{}, "body":null}',
+                      'credentials required', 401),
+                ('{"head":{"authorization":null,"method":"get"}, "body":null}',
+                      'credentials required', 401),
+                ('{"head":{"authorization":[],"method":"get"}, "body":null}',
+                      'credentials required', 401),
+                ('{"head":{"authorization":[null],"method":"get"}, "body":null}',
+                      'invalid username "null"', 401),
+                ('{"head":{"authorization":[1],"method":"get"}, "body":null}',
+                      'invalid username "1"', 401),
+                ('{"head":{"authorization":["foo man"],"method":"get"}, "body":null}',
+                      'invalid username "foo man"', 401),
+                ('{"head":{"authorization":["foo-man"],"method":"get"}, "body":null}',
+                      'invalid username "foo-man"', 401),
+                ('{"head":{"authorization":["foo_man"],"method":1}, "body":null}',
+                      'invalid method "1"', 405),
+                ('{"head":{"authorization":["foo_man"],"method":null}, "body":null}',
+                      'invalid method "null"', 405)
+                    ]
+
+    for json, message, status in invalids:
+      cxn.request('POST', '/', json, headers)
+      response = cxn.getresponse()
+      self.assertEqual(response.status, 200)
+      json_response = simplejson.loads(response.read())
+      self.assertEqual(json_response['head']['status'], status)
+      self.assertEqual(json_response['head']['message'], message)
+      self.assertEqual(json_response.get('body'), None)
+
+    cxn.close()
