@@ -64,7 +64,7 @@ def start(url_mapping):
 
   if accept != 'application/jsonrequest':
     msg = 'invalid JSONRequest Accept header %s from user agent %s' % \
-        (content_type, user_agent)
+        (webob_req.headers.get('Accept'), user_agent)
     logging.info(msg)
     startResponse(status=406)(msg)
     return False

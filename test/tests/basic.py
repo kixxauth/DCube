@@ -61,7 +61,25 @@ class JSONRequest(unittest.TestCase):
     cxn.request('GET', '/', None, headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 400)
+    tests.checkHeaders(response.getheaders(),
+        tests.defaultHeaders(content_length=False))
     self.assertEqual(response.read(),
         ('invalid JSONRequest Content-Type %s from user agent %s' % \
             (content_type, headers['User-Agent'])))
+    cxn.close()
+
+  def test_invalidAcceptHeader(self):
+    """JSONRequest invalid accept header"""
+    cxn = tests.httpConnection()
+    accept = 'text/html'
+    headers = tests.getJSONRequestHeaders()
+    headers['Accept'] = accept 
+    cxn.request('POST', '/', None, headers)
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 406)
+    tests.checkHeaders(response.getheaders(),
+        tests.defaultHeaders(content_length=False))
+    self.assertEqual(response.read(),
+        ('invalid JSONRequest Accept header %s from user agent %s' % \
+            (accept, headers['User-Agent'])))
     cxn.close()

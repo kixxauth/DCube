@@ -11,3 +11,4 @@ full:
     tests:
     - test_invalidMethods
     - test_invalidContentTypeHeader
+    - test_invalidAcceptHeader
