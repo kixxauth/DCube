@@ -1,25 +1,26 @@
+import os
 import unittest
 import yaml
-
-SUITES = {
-    'full': [
-            ('basic','RobotsTxt',['test_robotsTxt']),
-            ('basic','NotFound',['test_notFound']
-        )]
-    }
 
 def run_suites(suite_names):
   """Run the given list of test suite names corresponding to the SUITES
   configuration global.
   """
+  suites = yaml.load(
+      open(
+        os.path.join(
+          os.path.dirname(os.path.abspath(__file__)), 'config.yaml')))
+
   def build_names(agg, name):
-    parts = SUITES[name]
-    for part in parts:
-      tests = part[2]
-      for test in tests:
-        n = part[0], part[1], test
-        if not n in agg:
-          agg.append(n)
+    modules = suites[name]
+    for module in modules:
+      classes = module['classes']
+      for c in classes:
+        tests = c['tests']
+        for t in tests:
+          n = module['module'], c['name'], t
+          if n not in agg:
+            agg.append(n)
     return agg
 
   def build_test(loc):

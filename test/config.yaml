@@ -1,0 +1,9 @@
+full:
+- module: basic
+  classes:
+  - name: RobotsTxt
+    tests:
+    - test_robotsTxt
+  - name: NotFound
+    tests:
+    - test_notFound
