@@ -1,5 +1,6 @@
 import unittest
 import tests
+import simplejson
 
 class RobotsTxt(unittest.TestCase):
   def test_robotsTxt(self):
@@ -56,8 +57,7 @@ class JSONRequest(unittest.TestCase):
     """JSONRequest invalid content type header"""
     cxn = tests.httpConnection()
     content_type = 'application/x-www-form-urlencoded'
-    headers = tests.getJSONRequestHeaders()
-    headers['Content-Type'] = content_type
+    headers = tests.getJSONRequestHeaders(content_type=content_type)
     cxn.request('GET', '/', None, headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 400)
@@ -72,8 +72,7 @@ class JSONRequest(unittest.TestCase):
     """JSONRequest invalid accept header"""
     cxn = tests.httpConnection()
     accept = 'text/html'
-    headers = tests.getJSONRequestHeaders()
-    headers['Accept'] = accept 
+    headers = tests.getJSONRequestHeaders(accept=accept)
     cxn.request('POST', '/', None, headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 406)
@@ -82,4 +81,32 @@ class JSONRequest(unittest.TestCase):
     self.assertEqual(response.read(),
         ('invalid JSONRequest Accept header %s from user agent %s' % \
             (accept, headers['User-Agent'])))
+    cxn.close()
+
+  def test_invalidJSONRequestBody(self):
+    """JSONRequest invalid JSONRequest body"""
+    cxn = tests.httpConnection()
+    invalid_json = '{not valid json}'
+    headers = tests.getJSONRequestHeaders()
+
+    cxn.request('POST', '/', invalid_json, headers)
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 400)
+    tests.checkHeaders(response.getheaders(),
+        tests.defaultHeaders(content_length=False))
+    self.assertEqual(response.read(),
+        'invalid JSONRequest body from user agent %s' %
+            headers['User-Agent'])
+
+    invalid_json = '[1,2,3]'
+    cxn.request('POST', '/', invalid_json, headers)
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 200)
+    tests.checkHeaders(response.getheaders(),
+        tests.defaultHeaders(content_length=False))
+    json_response = simplejson.loads(response.read())
+    self.assertEqual(json_response['head']['status'], 400)
+    self.assertEqual(json_response['head']['message'], 'invalid JSON body')
+    self.assertEqual(json_response.get('body'), None)
+
     cxn.close()

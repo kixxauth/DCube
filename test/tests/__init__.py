@@ -12,11 +12,13 @@ def set_LOCALHOST(val):
   global LOCALHOST
   LOCALHOST = val
 
-def getJSONRequestHeaders():
+def getJSONRequestHeaders(content_type='application/jsonrequest',
+                          accept='application/jsonrequest',
+                          user_agent='testing_client'):
   return {
-    'Content-Type': 'application/jsonrequest',
-    'Accept': 'application/jsonrequest',
-    'User-Agent': 'testing_client'}
+    'Content-Type': content_type,
+    'Accept': accept,
+    'User-Agent': user_agent}
 
 def httpConnection():
   return httplib.HTTPConnection(HOST)

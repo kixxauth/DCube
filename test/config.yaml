@@ -12,3 +12,4 @@ full:
     - test_invalidMethods
     - test_invalidContentTypeHeader
     - test_invalidAcceptHeader
+    - test_invalidJSONRequestBody
