@@ -39,9 +39,18 @@ class JSONRequest(unittest.TestCase):
     """JSONRequest invalid http methods"""
     cxn = tests.httpConnection()
     cxn.request('PUT', '/', 'body to put')
-    self.assertEqual(cxn.getresponse().status, 405)
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 405)
+    tests.checkHeaders(response.getheaders(),
+        tests.defaultHeaders(content_length='0'))
+
     cxn.request('DELETE', '/', 'body to put')
-    self.assertEqual(cxn.getresponse().status, 405)
+    response = cxn.getresponse()
+    self.assertEqual(response.status, 405)
+    tests.checkHeaders(response.getheaders(),
+        tests.defaultHeaders(content_length='0'))
+
+    cxn.close()
 
   def test_invalidContentTypeHeader(self):
     """JSONRequest invalid content type header"""
