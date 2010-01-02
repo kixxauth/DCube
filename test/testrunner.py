@@ -7,6 +7,8 @@ import httplib
 import simplejson
 
 import tools
+import suites
+import tests
 
 HOST = None
 LOCALHOST = None
@@ -97,11 +99,6 @@ def createUser(username):
           json_response['head']['status'])
   return (json_response['head']['authorization'][1],
       json_response['head']['authorization'][2])
-
-class CheckHost(unittest.TestCase):
-  def testHost(self):
-    """Check for host availability."""
-    assert HOST, 'HOST should be defined.'
 
 class RobotsTxt(unittest.TestCase):
   def testRobotsTxt(self):
@@ -561,31 +558,31 @@ class NoUser(unittest.TestCase):
     self.assertEqual(len(json_response['head']['authorization']), 0)
 
 def main():
-  global HOST
-  global LOCALHOST
-  global REMOTE_HOST
-
   appconfigs = tools.getconfigs(
       os.path.join(
         os.path.split(
           os.path.split(os.path.abspath(__file__))[0])[0],
         'gae_py'))
 
-  LOCALHOST = 'localhost:8080'
-  REMOTE_HOST = (str(appconfigs.get('version')) +'.latest.'+
+  localhost = 'localhost:8080'
+  remote_host = (str(appconfigs.get('version')) +'.latest.'+
                  appconfigs.get('application') +'.appspot.com')
 
-  if tools.checkhost(LOCALHOST):
-    HOST = LOCALHOST 
-  elif tools.checkhost(REMOTE_HOST):
-    HOST = REMOTE_HOST 
+  tests.set_LOCALHOST(localhost)
+
+  if tools.checkhost(localhost):
+    tests.set_HOST(localhost) 
+  elif tools.checkhost(remote_host):
+    tests.set_HOST(remote_host) 
   else:
-    raise Exception('no connection to %s or %s'% (LOCALHOST, REMOTE_HOST))
+    raise Exception('no connection to %s or %s'% (localhost, remote_host))
 
-  print 'running tests on %s' % HOST
-  print
+  print ''
+  print 'running tests on %s' % tests.HOST
+  print ''
 
-  unittest.main()
+  #unittest.main()
+  suites.run_suites(['full'])
 
 if __name__ == '__main__':
   main()
