@@ -2,6 +2,8 @@ import unittest
 import tests
 import simplejson
 
+# todo: look into support for OPTIONS, HEAD, TRACE, and CONNECT http methods
+
 class RobotsTxt(unittest.TestCase):
   def test_robotsTxt(self):
     """Check for the robots.txt file."""
@@ -39,17 +41,19 @@ class JSONRequest(unittest.TestCase):
   def test_invalidMethods(self):
     """JSONRequest invalid http methods"""
     cxn = tests.httpConnection()
-    cxn.request('PUT', '/', 'body to put')
-    response = cxn.getresponse()
-    self.assertEqual(response.status, 405)
-    tests.checkHeaders(response.getheaders(),
-        tests.defaultHeaders(content_length='0'))
 
-    cxn.request('DELETE', '/', 'body to put')
-    response = cxn.getresponse()
-    self.assertEqual(response.status, 405)
-    tests.checkHeaders(response.getheaders(),
-        tests.defaultHeaders(content_length='0'))
+    methods = [
+        ('PUT', ['/', '/urls/']),
+        ('DELETE', ['/', '/urls/'])
+        ]
+
+    for m, urls in methods:
+      for url in urls:
+        cxn.request(m, url)
+        response = cxn.getresponse()
+        self.assertEqual(response.status, 405)
+        tests.checkHeaders(response.getheaders(),
+            tests.defaultHeaders(content_length='0'))
 
     cxn.close()
 
