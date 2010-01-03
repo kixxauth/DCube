@@ -39,8 +39,7 @@ def buildHTTPRequest():
   return webob.Request(env, charset='utf-8',
       unicode_errors='ignore', decode_param_names=True)
 
-def start(url_mapping):
-  webob_req = buildHTTPRequest()
+def buildJSONRequest(webob_req):
   user_agent = webob_req.headers.get('User-Agent')
 
   # todo: support OPTIONS HTTP method
@@ -94,9 +93,17 @@ def start(url_mapping):
       message=('invalid method "%s"' % method)))
     return False
 
-  json_req = dict(head={'method': head['method'].upper(),
-                    'authorization': (head.get('authorization') or [])},
+  auth = head.get('authorization')
+
+  return dict(head={'method': head['method'].upper(),
+                    'authorization': isinstance(auth, list) and auth or []},
               body=json_req.get('body'))
+
+def start(url_mapping):
+  webob_req = buildHTTPRequest()
+  json_req = buildJSONRequest(webob_req)
+  if not json_req:
+    return False
 
   # check for authentication credentials
   if len(json_req['head']['authorization']) is 0:
@@ -125,11 +132,11 @@ def start(url_mapping):
   try:
     chap_user['cnonce'] = json_req['head']['authorization'][1]
   except:
-    logging.warn('passed cnonce is %s', chap_user['cnonce'])
+    pass
   try:
     chap_user['response'] = json_req['head']['authorization'][2]
   except:
-    logging.warn('passed response is %s', chap_user['response'])
+    pass
 
   user_groups = gate.get_builder(
       username, ['ROOT'], 'get_user_groups')()
