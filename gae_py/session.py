@@ -26,7 +26,7 @@ def startResponse(status=200, content_type='application/jsonrequest'):
         (status, webapp.Response.http_status_message(status))),
       [('Content-Type', content_type), ('expires', '-1')])
 
-def start(url_mapping):
+def buildHTTPRequest():
   env = dict(os.environ)
   env['wsgi.input'] = sys.stdin
   env['wsgi.errors'] = sys.stderr
@@ -36,16 +36,18 @@ def start(url_mapping):
   env['wsgi.multithread'] = False
   env['wsgi.multiprocess'] = False
 
-  webob_req = webob.Request(env, charset='utf-8',
+  return webob.Request(env, charset='utf-8',
       unicode_errors='ignore', decode_param_names=True)
 
-  user_agent = env.get('HTTP_USER_AGENT')
+def start(url_mapping):
+  webob_req = buildHTTPRequest()
+  user_agent = webob_req.headers.get('User-Agent')
 
   # todo: support OPTIONS HTTP method
   # JSONRequest protocol only allows GET and POST HTTP methods
-  if env['REQUEST_METHOD'] != 'GET' and env['REQUEST_METHOD'] != 'POST':
+  if webob_req.method != 'GET' and webob_req.method != 'POST':
     logging.info('invalid JSONRequest method %s from user agent %s',
-        env['REQUEST_METHOD'], user_agent)
+        webob_req.method, user_agent)
     startResponse(status=405)
     return False
 
