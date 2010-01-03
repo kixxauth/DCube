@@ -14,3 +14,10 @@ full:
     - test_invalidAcceptHeader
     - test_invalidJSONRequestBody
     - test_invalids
+- module: users
+  classes:
+  - name: UsersURL
+    tests:
+    - test_methodNotAllowed
+    - test_noUserURL
+    - test_usernameNotMatch

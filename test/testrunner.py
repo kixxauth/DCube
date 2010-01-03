@@ -382,6 +382,8 @@ def main():
                  appconfigs.get('application') +'.appspot.com')
 
   tests.set_LOCALHOST(localhost)
+  tests.set_USERNAME('test_user1')
+  tests.set_PASSKEY('test$key')
 
   if tools.checkhost(localhost):
     tests.set_HOST(localhost) 

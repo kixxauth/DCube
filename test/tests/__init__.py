@@ -3,6 +3,8 @@ import simplejson
 
 HOST = 'localhost'
 LOCALHOST = 'localhost'
+USERNAME = None
+PASSKEY = None
 
 def set_HOST(val):
   global HOST
@@ -11,6 +13,14 @@ def set_HOST(val):
 def set_LOCALHOST(val):
   global LOCALHOST
   LOCALHOST = val
+
+def set_USERNAME(val):
+  global USERNAME
+  USERNAME = val
+
+def set_PASSKEY(val):
+  global PASSKEY 
+  PASSKEY = val
 
 def getJSONRequestHeaders(content_type='application/jsonrequest',
                           accept='application/jsonrequest',
