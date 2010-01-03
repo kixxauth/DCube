@@ -21,3 +21,6 @@ full:
     - test_methodNotAllowed
     - test_noUserURL
     - test_usernameNotMatch
+  - name: ExistingUser
+    tests:
+    - test_userExists

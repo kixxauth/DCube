@@ -1,3 +1,4 @@
+import hashlib
 import httplib
 import simplejson
 
@@ -71,3 +72,33 @@ def makeJSONRequest_for_httplib(url='/', method='get', creds=[], body=None):
   httplib.Connection().request()"""
   return ('POST', url,
       createJSONRequest(method, creds, body), getJSONRequestHeaders())
+
+def createCredentials(passkey, username, nonce, nextnonce):
+  """Takes passkey, nonce, nextnonce and returns a list;
+  [username, cnonce, response]
+  """
+  def hash(s):
+    return hashlib.sha1(s).hexdigest()
+
+  def cnonce(key):
+    return hash(hash(key))
+
+  def response(key):
+    return hash(key)
+
+  def juxt(passkey, seed):
+    return str(passkey) + str(seed)
+
+  return [username,
+      cnonce(juxt(passkey, nextnonce)),
+      response(juxt(passkey, nonce))]
+
+def makeRequest(url='/', method='get', creds=[]):
+  cxn = httpConnection()
+  req = makeJSONRequest_for_httplib(
+        url=url, method=method, creds=creds)
+  cxn.request(*req)
+  res = cxn.getresponse().read()
+  rv = simplejson.loads(res)
+  cxn.close()
+  return rv

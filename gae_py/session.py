@@ -123,11 +123,11 @@ def start(url_mapping):
   try:
     chap_user['cnonce'] = json_req['head']['authorization'][1]
   except:
-    pass
+    logging.warn('passed cnonce is %s', chap_user['cnonce'])
   try:
     chap_user['response'] = json_req['head']['authorization'][2]
   except:
-    pass
+    logging.warn('passed response is %s', chap_user['response'])
 
   user_groups = gate.get_builder(
       username, ['ROOT'], 'get_user_groups')()

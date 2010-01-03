@@ -1,5 +1,4 @@
 import os
-import hashlib
 import httplib
 import yaml
 
@@ -16,23 +15,3 @@ def getconfigs(dir):
   configs as parsed by PyYaml.
   """
   return yaml.load(open(os.path.join(dir, 'app.yaml')))
-
-def hash(s):
-  return hashlib.sha1(s).hexdigest()
-
-def cnonce(key):
-  return hash(hash(key))
-
-def response(key):
-  return hash(key)
-
-def juxt(passkey, seed):
-  return str(passkey) + str(seed)
-
-def createCredentials(passkey, username, nonce, nextnonce):
-  """Takes passkey, nonce, nextnonce and returns a list;
-  [username, cnonce, response]
-  """
-  return [username,
-      cnonce(juxt(passkey, nextnonce)),
-      response(juxt(passkey, nonce))]
