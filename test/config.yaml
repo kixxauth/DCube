@@ -23,4 +23,11 @@ full:
     - test_usernameNotMatch
   - name: ExistingUser
     tests:
-    - test_userExists
+    - test_getUser
+    - test_putUser
+    - test_deleteUser
+  - name: NoUser
+    tests:
+    - test_getUser
+    - test_putUser
+    - test_deleteUser

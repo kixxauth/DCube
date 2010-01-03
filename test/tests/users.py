@@ -97,7 +97,8 @@ class UsersURL(unittest.TestCase):
           tests.defaultHeaders(content_length=False))
 
       json_response = simplejson.loads(response.read())
-      self.assertEqual(json_response['head']['status'], 400)
+      self.assertEqual(json_response['head']['status'], 400,
+          'got: %s (%s)'% (json_response['head']['status'], m))
       self.assertEqual(json_response['head']['message'],
                        ('username "%s" does not match url "/users/foo_bar"' %
                          tests.USERNAME))
@@ -112,23 +113,100 @@ class ExistingUser(unittest.TestCase):
   def tearDown(self):
     removeUser(tests.USERNAME, tests.PASSKEY)
 
-  def test_userExists(self):
-    """get, put, and delete methods when user exists."""
-    methods = ['put', 'get', 'delete']
+  def test_getUser(self):
+    """GET a user that exists."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='get', creds=[tests.USERNAME])
 
-    for m in methods:
-      json_response = tests.makeRequest(
-          url=(URL_USERS + tests.USERNAME), method=m, creds=[tests.USERNAME])
-      self.assertEqual(json_response['head']['status'], 401, 'method: '+m)
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
+    self.assertEqual(json_response.get('body'), None)
 
-      creds = tests.createCredentials(tests.PASSKEY,
-          *json_response['head']['authorization'])
-      json_response = tests.makeRequest(
-          url=(URL_USERS + tests.USERNAME), method=m, creds=creds)
+    creds = tests.createCredentials(tests.PASSKEY,
+        *json_response['head']['authorization'])
 
-      self.assertEqual(json_response['head']['status'], 200, 'method: '+m)
-      if m == 'delete':
-        self.assertEqual(json_response.get('body'), None, 'method: '+m)
-      else:
-        self.assertEqual(json_response.get('body'),
-            {'username': tests.USERNAME, 'groups': ['users']}, 'method: '+m)
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+        {'username': tests.USERNAME, 'groups': ['users']})
+
+  def test_putUser(self):
+    """PUT a user that already exists."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='put', creds=[tests.USERNAME])
+
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
+    self.assertEqual(json_response.get('body'), None)
+
+    creds = tests.createCredentials(tests.PASSKEY,
+        *json_response['head']['authorization'])
+
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+        {'username': tests.USERNAME, 'groups': ['users']})
+
+  def test_deleteUser(self):
+    """DELETE a user that already exists"""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='delete', creds=[tests.USERNAME])
+
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
+    self.assertEqual(json_response.get('body'), None)
+
+    creds = tests.createCredentials(tests.PASSKEY,
+        *json_response['head']['authorization'])
+
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+        {'username': tests.USERNAME, 'groups': ['users']})
+
+class NoUser(unittest.TestCase):
+  def setUp(self):
+    """Delete the test user to setUp the create user test."""
+    removeUser(tests.USERNAME, tests.PASSKEY)
+
+  def test_putUser(self):
+    """PUT a new user"""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='put', creds=[tests.USERNAME])
+
+    self.assertEqual(json_response['head']['status'], 201)
+    self.assertEqual(json_response['head']['message'],
+        'created new user "%s"'% tests.USERNAME)
+    self.assertEqual(json_response['head']['authorization'][0], tests.USERNAME)
+    self.assertEqual(len(json_response['head']['authorization'][1]), 40)
+    self.assertEqual(len(json_response['head']['authorization'][2]), 40)
+    self.assertEqual(json_response.get('body'),
+        {'username': tests.USERNAME, 'groups': ['users']})
+
+  def test_getUser(self):
+    """GET a non existing user."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='get', creds=[tests.USERNAME])
+
+    self.assertEqual(json_response['head']['status'], 404)
+    self.assertEqual(json_response['head']['message'],
+        'user "%s" not found'% tests.USERNAME)
+    self.assertEqual(json_response['head']['authorization'], [])
+    self.assertEqual(json_response.get('body'), None)
+
+  def test_deleteUser(self):
+    """DELETE the non existing test user."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='delete', creds=[tests.USERNAME])
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response['head']['message'],
+        'deleted user "%s"'% tests.USERNAME)
+    self.assertEqual(json_response['head']['authorization'], [])
+    self.assertEqual(json_response.get('body'), None)
