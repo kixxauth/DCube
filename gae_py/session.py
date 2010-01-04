@@ -12,187 +12,222 @@ from django.utils import simplejson
 import gate
 import pychap
 
-class Session():
+class StopSession(Exception):
+  def __init__(self, val):
+    self.value = val
+  def __str__(self):
+    return repr(self.value)
+
+class Pub():
   pass
 
-def createJSONResponse(status=200, message='ok', creds=[], body=None):
-  return simplejson.dumps(dict(
-      head=dict(status=status, message=message, authorization=creds),
-      body=body))
+class Session():
+  def __init__(self):
+    env = dict(os.environ)
+    env['wsgi.input'] = sys.stdin
+    env['wsgi.errors'] = sys.stderr
+    env['wsgi.version'] = (1, 0)
+    env['wsgi.run_once'] = True
+    env['wsgi.url_scheme'] = wsgiref.util.guess_scheme(env)
+    env['wsgi.multithread'] = False
+    env['wsgi.multiprocess'] = False
 
-def startResponse(status=200, content_type='application/jsonrequest'):
-  return util._start_response(
-      ('%d %s' %
-        (status, webapp.Response.http_status_message(status))),
-      [('Content-Type', content_type), ('expires', '-1')])
+    wr = webob.Request(env, charset='utf-8',
+        unicode_errors='ignore', decode_param_names=True)
 
-def buildHTTPRequest():
-  env = dict(os.environ)
-  env['wsgi.input'] = sys.stdin
-  env['wsgi.errors'] = sys.stderr
-  env['wsgi.version'] = (1, 0)
-  env['wsgi.run_once'] = True
-  env['wsgi.url_scheme'] = wsgiref.util.guess_scheme(env)
-  env['wsgi.multithread'] = False
-  env['wsgi.multiprocess'] = False
+    self.username = None
+    self.handlers = None
+    self.handler = None
+    self.url_groups = None
+    self.allow_none_user = False
+    self.user_agent = env.get('HTTP_USER_AGENT')
+    self.http_method = env.get('REQUEST_METHOD')
+    self.content_type = wr.headers.get('Content-Type')
+    self.accept = wr.headers.get('Accept')
+    self.path = wr.path
+    self.auth_user = {'nonce': None, 'nextnonce': None}
+    self.user_groups = []
 
-  return webob.Request(env, charset='utf-8',
-      unicode_errors='ignore', decode_param_names=True)
+  def checkHandlers(self, url_mapping):
+    for regexp, handlers in url_mapping:
+      match = re.match(regexp, self.path)
+      if match:
+        self.handlers = handlers
+        self.url_groups = match.groups()
+        return self
 
-def buildJSONRequest(webob_req):
-  user_agent = webob_req.headers.get('User-Agent')
+    msg = 'the url "%s" could not be found on this host.' % self.path
+    self.startResponse(status=404, content_type='text/plain')(msg)
+    raise StopSession(msg)
 
-  # todo: support OPTIONS HTTP method
-  # JSONRequest protocol only allows GET and POST HTTP methods
-  if webob_req.method != 'GET' and webob_req.method != 'POST':
-    logging.info('invalid JSONRequest method %s from user agent %s',
-        webob_req.method, user_agent)
-    startResponse(status=405)
-    return False
+  def buildJSONRequest(self):
+    # todo: support other HTTP methods (except PUT and DELETE)
+    # JSONRequest protocol only allows GET and POST HTTP methods
+    if self.http_method != 'GET' and self.http_method != 'POST':
+      msg = 'invalid JSONRequest method %s from user agent %s' % \
+          (self.http_method, self.user_agent)
+      logging.info(msg)
+      self.startResponse(status=405)
+      raise StopSession(msg)
 
-  # check content-type request header to meet JSONRequest spec
-  content_type = webob_req.headers.get('Content-Type')
+    # check content-type request header to meet JSONRequest spec
+    if self.content_type != 'application/jsonrequest':
+      msg = 'invalid JSONRequest Content-Type %s from user agent %s' % \
+          (self.content_type, self.user_agent)
+      logging.info(msg)
+      startResponse(status=400)(msg)
+      raise StopSession(msg)
 
-  if content_type != 'application/jsonrequest':
-    msg = 'invalid JSONRequest Content-Type %s from user agent %s' % \
-        (content_type, user_agent)
-    logging.info(msg)
-    startResponse(status=400)(msg)
-    return False
+    # check accept request header to meet JSONRequest spec
+    if self.accept != 'application/jsonrequest':
+      msg = 'invalid JSONRequest Accept header %s from user agent %s' % \
+          (self.accept, self.user_agent)
+      logging.info(msg)
+      startResponse(status=406)(msg)
+      raise StopSession(msg)
 
-  # check accept request header to meet JSONRequest spec
-  accept = webob_req.headers.get('Accept')
+    # load request body JSON
+    json_req = None
+    try:
+      json_req = simplejson.loads(webob_req.body)
+    except:
+      msg = 'invalid JSONRequest body from user agent %s' % user_agent
+      logging.info(msg)
+      startResponse(status=400)(msg)
+      raise StopSession(msg)
 
-  if accept != 'application/jsonrequest':
-    msg = 'invalid JSONRequest Accept header %s from user agent %s' % \
-        (webob_req.headers.get('Accept'), user_agent)
-    logging.info(msg)
-    startResponse(status=406)(msg)
-    return False
+    if not isinstance(json_req, dict):
+      msg = 'invalid JSON body'
+      startResponse()(self.createJSONResponse(status=400, message=msg))
+      raise StopSession(msg)
 
-  # load request body JSON
-  json_req = None
-  try:
-    json_req = simplejson.loads(webob_req.body)
-  except:
-    msg = 'invalid JSONRequest body from user agent %s' % user_agent
-    logging.info(msg)
-    startResponse(status=400)(msg)
-    return False
+    head = (isinstance(json_req.get('head'), dict) and \
+        json_req['head'] or {'method': 'GET', 'authorization': []})
 
-  if not isinstance(json_req, dict):
-    startResponse()(createJSONResponse(status=400, message='invalid JSON body'))
-    return False
+    if not isinstance(head.get('method'), basestring):
+      method = (head.get('method') is None) and 'null' or head.get('method')
+      msg = 'invalid method "%s"' % method
+      startResponse()(self.createJSONResponse(status=405,
+        message=('invalid method "%s"' % method)))
+      raise StopSession(msg)
 
-  head = (isinstance(json_req.get('head'), dict) and \
-      json_req['head'] or {'method': 'GET', 'authorization': []})
+    auth = head.get('authorization')
+    self.json_req = dict(head={'method': head['method'].upper(),
+               'authorization': isinstance(auth, list) and auth or []},
+         body=json_req.get('body'))
 
-  if not isinstance(head.get('method'), basestring):
-    method = (head.get('method') is None) and 'null' or head.get('method')
-    startResponse()(createJSONResponse(status=405,
-      message=('invalid method "%s"' % method)))
-    return False
+    return self
 
-  auth = head.get('authorization')
+  def checkMethod(self):
+    self.handler = self.handlers.get(self.json_req['head']['method'])
 
-  return dict(head={'method': head['method'].upper(),
-                    'authorization': isinstance(auth, list) and auth or []},
-              body=json_req.get('body'))
+    # The handler object may be a tuple containing optional directives
+    if isinstance(handler, tuple):
+      self.handler, self.allow_none_user = handler
+
+    if not isinstance(self.handler, list):
+      msg = '"%s" method not allowed' % self.json_req['head']['method']
+      startResponse()(self.createJSONResponse(status=405, message=msg))
+      raise StopSession(msg)
+
+    return self
+
+  def authenticate(self):
+    # check for authentication credentials
+    if len(self.json_req['head']['authorization']) is 0:
+      msg = 'credentials required'
+      self.startResponse()(self.createJSONResponse(status=401, message=msg))
+      raise StopSession(msg)
+
+    # check the username
+    username = this.json_req['head']['authorization'][0]
+    if not isinstance(username, basestring):
+      username = (username is None) and 'null' or username 
+      msg = 'invalid username "%s"' % username
+      startResponse()(self.createJSONResponse(status=401, message=msg))
+      raise StopSession(msg)
+
+    if self.checkUsername(username):
+      startResponse()(self.createJSONResponse(status=401, message=msg))
+      raise StopSession(msg)
+
+    chap_user = gate.get_builder(
+        username, ['ROOT'], 'get_chap_user_creds')()
+    chap_user['cnonce'] = None
+    chap_user['response'] = None
+    try:
+      chap_user['cnonce'] = self.json_req['head']['authorization'][1]
+    except:
+      pass
+    try:
+      chap_user['response'] = self.json_req['head']['authorization'][2]
+    except:
+      pass
+
+    self.user_groups = gate.get_builder(
+        username, ['ROOT'], 'get_user_groups')()
+
+    auth_user = pychap.authenticate(gate.get_builder(
+      username, ['ROOT'], 'update_chap_user_creds'), **chap_user)
+
+    self.username = username
+    self.user_exists = (auth_user.message != pychap.USER_NA)
+    self.auth_user['nonce'] = auth_user.nonce
+    self.auth_user['nextnonce'] = auth_user.nextnonce
+    if auth_user.authenticated or \
+        (auth_user.message is pychap.USER_NA and allow_none_user):
+          return self
+
+    self.startResponse()(self.createJSONResponse(status=401, message='authenticate',
+      creds=[username, auth_user.nonce, auth_user.nextnonce]))
+    raise StopSession('authenticate')
+
+  def callHandler(self):
+    pub = Pub()
+    pub.username = self.username
+    pub.url = self.path
+    pub.userExists = self.user_exists
+    pub.authenticate = [
+        self.username, self.auth_user['nonce'], self.auth_user['nextnonce']]
+    pub.body = None
+    pub.status = 200
+    pub.message = 'ok'
+
+    def get_store_factory(interface):
+      return gate.get_builder(self.username,
+                           self.user_groups, interface)
+
+    for h in handler:
+      if not h(pub, get_store_factory, *self.url_groups):
+        break
+
+    self.startResponse()(self.createJSONResponse(status=pub.status,
+                                  message=pub.message,
+                                  creds=pub.authenticate,
+                                  body=pub.body))
+    return True
+
+  def checkUsername(self, username):
+    return re.search('\W', username)
+
+  def startResponse(self, status=200, content_type='application/jsonrequest'):
+    return util._start_response(
+        ('%d %s' %
+          (status, webapp.Response.http_status_message(status))),
+        [('Content-Type', content_type), ('expires', '-1')])
+
+  def createJSONResponse(self, status=200, message='ok', creds=[], body=None):
+    return simplejson.dumps(dict(
+        head=dict(status=status, message=message, authorization=creds),
+        body=body))
 
 def start(url_mapping):
-  webob_req = buildHTTPRequest()
-  json_req = buildJSONRequest(webob_req)
-  if not json_req:
-    return False
-
-  # check for authentication credentials
-  if len(json_req['head']['authorization']) is 0:
-    startResponse()(createJSONResponse(status=401, message='credentials required'))
-    return False
-
-  # check the username
-  username = json_req['head']['authorization'][0]
-  if not isinstance(username, basestring):
-    username = (username is None) and 'null' or username 
-    startResponse()(createJSONResponse(status=401,
-               message=('invalid username "%s"' % \
-                   username)))
-    return False
-
-  if re.search('\W', username):
-    startResponse()(createJSONResponse(status=401,
-               message=('invalid username "%s"' % \
-                   username)))
-    return False
-
-  chap_user = gate.get_builder(
-      username, ['ROOT'], 'get_chap_user_creds')()
-  chap_user['cnonce'] = None
-  chap_user['response'] = None
   try:
-    chap_user['cnonce'] = json_req['head']['authorization'][1]
-  except:
+    Session().\
+        checkHandlers(url_mapping).\
+        buildJSONRequest().\
+        checkMethod().\
+        authenticate().\
+        callHandler()
+  except StopSession:
     pass
-  try:
-    chap_user['response'] = json_req['head']['authorization'][2]
-  except:
-    pass
-
-  user_groups = gate.get_builder(
-      username, ['ROOT'], 'get_user_groups')()
-
-  handler = None
-  url_groups = ()
-  for regexp, handlers in url_mapping:
-    match = re.match(regexp, webob_req.path)
-    if match:
-      handler = handlers.get(json_req['head']['method'])
-
-      # The handler object may be a tuple containing optional directives
-      allow_none_user = False
-      if isinstance(handler, tuple):
-        allow_none_user = handler[1]
-        handler = handler[0]
-
-      if isinstance(handler, list):
-        url_groups = match.groups()
-
-        auth_user = pychap.authenticate(gate.get_builder(
-          username, ['ROOT'], 'update_chap_user_creds'), **chap_user)
-
-        session = Session()
-        session.username = username
-        session.url = webob_req.path
-        session.userExists = (auth_user.message != pychap.USER_NA)
-        session.authenticate = [username, auth_user.nonce, auth_user.nextnonce]
-        session.body = None
-
-        if auth_user.authenticated or \
-            (not session.userExists and allow_none_user):
-          session.status = 200
-          session.message = 'ok'
-
-          def get_store_factory(interface):
-            return gate.get_builder(username,
-                                 user_groups, interface)
-
-          for h in handler:
-            if not h(session, get_store_factory, *url_groups):
-              break
-
-        else:
-          session.status = 401
-          session.message = 'authenticate'
-
-        startResponse()(createJSONResponse(status=session.status,
-                                      message=session.message,
-                                      creds=session.authenticate,
-                                      body=session.body))
-        return True
-      else:
-        startResponse()(createJSONResponse(status=405,
-          message=('"%s" method not allowed' % json_req['head']['method'])))
-        return False
-
-  startResponse(status=404, content_type='text/plain')(
-      'the url "%s" could not be found on this host.' % webob_req.path)
