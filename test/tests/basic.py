@@ -47,12 +47,16 @@ class JSONRequest(unittest.TestCase):
 
     for m, urls in methods:
       for url in urls:
-        cxn.request(m, url)
+        if m == 'PUT':
+          cxn.request(m, url, '', {'content-length': '0'})
+        else:
+          cxn.request(m, url)
         response = cxn.getresponse()
         self.assertEqual(response.status, 405,
-            'method %s, url %s' % (m, url))
+            'method %s, url %s, got(%d)' % (m, url, response.status))
         tests.checkHeaders(response.getheaders(),
             tests.defaultHeaders(content_length='0'))
+        body = response.read()
 
     cxn.close()
 
@@ -73,14 +77,12 @@ class JSONRequest(unittest.TestCase):
     cxn = tests.httpConnection()
     accept = 'text/html'
     headers = tests.getJSONRequestHeaders(accept=accept)
-    cxn.request('POST', '/', '', headers)
+    headers['content-length'] = 2
+    cxn.request('POST', '/', 'hi', headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 406)
     tests.checkHeaders(response.getheaders(),
         tests.defaultHeaders(content_length=False))
-    self.assertEqual(response.read(),
-        ('invalid JSONRequest Accept header %s from user agent %s' % \
-            (accept, headers['User-Agent'])))
     cxn.close()
 
   def test_invalidJSONRequestBody(self):
@@ -88,14 +90,17 @@ class JSONRequest(unittest.TestCase):
     cxn = tests.httpConnection()
     invalid_json = '{not valid json}'
     headers = tests.getJSONRequestHeaders()
+    headers['content-length'] = len(invalid_json)
 
     cxn.request('POST', '/', invalid_json, headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 400)
     tests.checkHeaders(response.getheaders(),
         tests.defaultHeaders(content_length=False))
+    body = response.read()
 
     invalid_json = '[1,2,3]'
+    headers['content-length'] = len(invalid_json)
     cxn.request('POST', '/', invalid_json, headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 200)
