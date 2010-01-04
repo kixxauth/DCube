@@ -44,12 +44,17 @@ class Session():
     self.http_method = env.get('REQUEST_METHOD')
     self.content_type = wr.headers.get('Content-Type')
     self.accept = wr.headers.get('Accept')
+    self.http_body = wr.body
     self.path = wr.path
     self.auth_user = {'nonce': None, 'nextnonce': None}
     self.user_groups = []
 
   def checkHandlers(self, url_mapping):
     for regexp, handlers in url_mapping:
+      if not regexp.startswith('^'):
+        regexp = '^' + regexp
+      if not regexp.endswith('$'):
+        regexp += '$'
       match = re.match(regexp, self.path)
       if match:
         self.handlers = handlers
@@ -75,7 +80,7 @@ class Session():
       msg = 'invalid JSONRequest Content-Type %s from user agent %s' % \
           (self.content_type, self.user_agent)
       logging.info(msg)
-      startResponse(status=400)(msg)
+      self.startResponse(status=400)(msg)
       raise StopSession(msg)
 
     # check accept request header to meet JSONRequest spec
@@ -83,22 +88,22 @@ class Session():
       msg = 'invalid JSONRequest Accept header %s from user agent %s' % \
           (self.accept, self.user_agent)
       logging.info(msg)
-      startResponse(status=406)(msg)
+      self.startResponse(status=406)(msg)
       raise StopSession(msg)
 
     # load request body JSON
     json_req = None
     try:
-      json_req = simplejson.loads(webob_req.body)
+      json_req = simplejson.loads(self.http_body)
     except:
-      msg = 'invalid JSONRequest body from user agent %s' % user_agent
+      msg = 'invalid JSONRequest body from user agent %s' % self.user_agent
       logging.info(msg)
-      startResponse(status=400)(msg)
+      self.startResponse(status=400)(msg)
       raise StopSession(msg)
 
     if not isinstance(json_req, dict):
       msg = 'invalid JSON body'
-      startResponse()(self.createJSONResponse(status=400, message=msg))
+      self.startResponse()(self.createJSONResponse(status=400, message=msg))
       raise StopSession(msg)
 
     head = (isinstance(json_req.get('head'), dict) and \
@@ -107,7 +112,7 @@ class Session():
     if not isinstance(head.get('method'), basestring):
       method = (head.get('method') is None) and 'null' or head.get('method')
       msg = 'invalid method "%s"' % method
-      startResponse()(self.createJSONResponse(status=405,
+      self.startResponse()(self.createJSONResponse(status=405,
         message=('invalid method "%s"' % method)))
       raise StopSession(msg)
 
@@ -122,12 +127,12 @@ class Session():
     self.handler = self.handlers.get(self.json_req['head']['method'])
 
     # The handler object may be a tuple containing optional directives
-    if isinstance(handler, tuple):
-      self.handler, self.allow_none_user = handler
+    if isinstance(self.handler, tuple):
+      self.handler, self.allow_none_user = self.handler
 
     if not isinstance(self.handler, list):
       msg = '"%s" method not allowed' % self.json_req['head']['method']
-      startResponse()(self.createJSONResponse(status=405, message=msg))
+      self.startResponse()(self.createJSONResponse(status=405, message=msg))
       raise StopSession(msg)
 
     return self
@@ -140,15 +145,18 @@ class Session():
       raise StopSession(msg)
 
     # check the username
-    username = this.json_req['head']['authorization'][0]
+    username = self.json_req['head']['authorization'][0]
     if not isinstance(username, basestring):
       username = (username is None) and 'null' or username 
       msg = 'invalid username "%s"' % username
-      startResponse()(self.createJSONResponse(status=401, message=msg))
+      self.startResponse()(self.createJSONResponse(status=401, message=msg))
       raise StopSession(msg)
 
+    # todo: join with conditional above
     if self.checkUsername(username):
-      startResponse()(self.createJSONResponse(status=401, message=msg))
+      username = (username is None) and 'null' or username 
+      msg = 'invalid username "%s"' % username
+      self.startResponse()(self.createJSONResponse(status=401, message=msg))
       raise StopSession(msg)
 
     chap_user = gate.get_builder(
@@ -175,7 +183,7 @@ class Session():
     self.auth_user['nonce'] = auth_user.nonce
     self.auth_user['nextnonce'] = auth_user.nextnonce
     if auth_user.authenticated or \
-        (auth_user.message is pychap.USER_NA and allow_none_user):
+        (auth_user.message is pychap.USER_NA and self.allow_none_user):
           return self
 
     self.startResponse()(self.createJSONResponse(status=401, message='authenticate',
@@ -197,7 +205,7 @@ class Session():
       return gate.get_builder(self.username,
                            self.user_groups, interface)
 
-    for h in handler:
+    for h in self.handler:
       if not h(pub, get_store_factory, *self.url_groups):
         break
 

@@ -40,11 +40,20 @@ def users_delete_handler(this, storeFactory, user_url):
     logging.info('Deleted user "%s"', this.username)
   this.message = 'deleted user "%s"' % this.username
 
+def base_handler(this, storeFactory):
+  this.message = 'DCube: Distributed Discriptive Datastore JSONRequest server.'
+
 def main():
   session.start([
-    ('/users/(\w*)', {'PUT': ([users_base_handler, users_put_handler], True),
-                      'GET': ([users_base_handler, users_get_handler], True),
-                      'DELETE': ([users_base_handler, users_delete_handler], True)})
+
+    ('/users/(\w*)',
+      {'PUT': ([users_base_handler, users_put_handler], True),
+       'GET': ([users_base_handler, users_get_handler], True),
+       'DELETE': ([users_base_handler, users_delete_handler], True)}),
+
+    ('/',
+      {'GET': ([base_handler], True)})
+
     ])
 
 if __name__ == '__main__':

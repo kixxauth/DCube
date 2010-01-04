@@ -21,13 +21,11 @@ class RobotsTxt(unittest.TestCase):
                        content_type='text/plain'))
     cxn.close()
 
-# todo: this should not need to be a JSONRequest
 class NotFound(unittest.TestCase):
   def test_notFound(self):
     """Check for not found response."""
     cxn = tests.httpConnection()
-    cxn.request(*tests.makeJSONRequest_for_httplib(
-          url='/foo', method='get', creds=['foo_man']))
+    cxn.request('GET', '/foo')
     response = cxn.getresponse()
     self.assertEqual(response.status, 404)
     tests.checkHeaders(response.getheaders(),
@@ -43,15 +41,16 @@ class JSONRequest(unittest.TestCase):
     cxn = tests.httpConnection()
 
     methods = [
-        ('PUT', ['/', '/urls/']),
-        ('DELETE', ['/', '/urls/'])
+        ('PUT', ['/', '/users/']),
+        ('DELETE', ['/', '/users/'])
         ]
 
     for m, urls in methods:
       for url in urls:
         cxn.request(m, url)
         response = cxn.getresponse()
-        self.assertEqual(response.status, 405)
+        self.assertEqual(response.status, 405,
+            'method %s, url %s' % (m, url))
         tests.checkHeaders(response.getheaders(),
             tests.defaultHeaders(content_length='0'))
 
