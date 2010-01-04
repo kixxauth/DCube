@@ -17,7 +17,7 @@ class RobotsTxt(unittest.TestCase):
 
     self.assertEqual(response.status, 200)
     tests.checkHeaders(response.getheaders(),
-        tests.defaultHeaders(content_length='26',
+        tests.defaultHeaders(content_length='26', cache_control='public',
                        content_type='text/plain'))
     cxn.close()
 

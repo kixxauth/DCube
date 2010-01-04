@@ -25,7 +25,7 @@ def set_PASSKEY(val):
 
 def getJSONRequestHeaders(content_type='application/jsonrequest',
                           accept='application/jsonrequest',
-                          user_agent='testing_client'):
+                          user_agent=None):
   return {
     'Content-Type': content_type,
     'Accept': accept,
@@ -35,16 +35,18 @@ def httpConnection():
   return httplib.HTTPConnection(HOST)
 
 # todo: get the server header for the live server
-def defaultHeaders(content_length='0',
+def defaultHeaders(content_length=False,
                    content_type='application/jsonrequest',
-                   cache_control='no-cache',
+                   cache_control='private',
                    expires='-1'):
   """Returns a set of headers expected by default from the DCube host server,
   but can be configured by passing different keyed parameters.
   """
   return {'content-type': content_type,
           'content-length': content_length,
-          'server':(HOST is LOCALHOST and 'Development/1.0' or 'foo'),
+          'server': (HOST is LOCALHOST and 'Development/1.0' or 'Google Frontend'),
+          'x-xss-protection': '0',
+          'transfer-encoding': False,
           'date': False,
           'cache-control': cache_control,
           'expires': expires}

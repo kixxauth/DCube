@@ -218,11 +218,12 @@ class Session():
   def checkUsername(self, username):
     return re.search('\W', username)
 
+  # todo: allow more control over configuration of headers
   def startResponse(self, status=200, content_type='application/jsonrequest'):
     return util._start_response(
         ('%d %s' %
           (status, webapp.Response.http_status_message(status))),
-        [('Content-Type', content_type), ('expires', '-1')])
+        [('Content-Type', content_type), ('cache-control', 'private'), ('expires', '-1')])
 
   def createJSONResponse(self, status=200, message='ok', creds=[], body=None):
     return simplejson.dumps(dict(

@@ -3,7 +3,9 @@ def main():
   print 'Status: 200 OK' 
   print 'Content-Type: text/plain'
   print 'Content-Length: %d' % len(body)
-  print 'expires: -1'
+  # todo: use datetime to set an expires header in the future
+  print 'Expires: -1'
+  print 'Cache-Control: public'
   print
   print body 
 
