@@ -6,8 +6,11 @@ directed descriptive graph in a similar way to the Resource Description
 Framework [(RDF)][1]. This software is a prototype implementation used to
 explore the possibilities of such a data store built upon open web protocols,
 architecture, and technologies like like HTTP and JSON, drawing influence from
-[Representational State Transfer][2], RDF, the semantic web, and the related
+[Representational State Transfer][2], RDF, the semantic web, and related
 concepts.
+
+In effect, this implementation of DCube just exposes a [JSONRequest][3] API that
+gives users access to Google App Engine distrubuted datastore.
 
 ### This DCube host is implemented in Python on Google App Engine service platform.
 
@@ -17,6 +20,13 @@ concepts.
   - [@kixxauth](http://twitter.com/kixxauth)
   - There will be a blog post with comments before long
   - Drop me a note on GitHub with the messaging system
+
+Usage
+-----
+DCube is still several iterations away from real usability. So far the only
+capability available is the creation and removal of user accounts.  The best
+way to start using DCube is to fork this project and and notify the project
+owner, who will help you get set up.
 
 License
 -------
@@ -47,3 +57,4 @@ THE SOFTWARE.
 
   [1]:http://www.w3.org/RDF/
   [2]:http://www.ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm
+  [3]:http://www.json.org/JSONRequest.html

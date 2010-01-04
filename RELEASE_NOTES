@@ -1,0 +1,34 @@
+Release Notes for DCube
+=======================
+
+0.1 Jan 4, 2010
+---------------
+
+- A robots.txt file in the main domain to inform bots that they may not want to
+  crawl this domain.
+
+- A handler for the /environs URL that simply prints a list of all the
+  environment variables.
+
+- A proxy interface to the App Engine datastore based on the principles of
+  users and groups in Unix file systems. This interface limits access to
+  persisted data in the datastore through a system of smoke and mirrors that does
+  not enforce security policy, but rather, it avoids insecure programming
+  mistakes and organizes the code for better comrehension.
+
+- A factory module (factory.py) that builds privileged interfaces to the
+  datastore.
+
+- A gate module (gate.py) that manages access to the datastore interface
+  factory using a YAML configuration file.
+
+- Advanced challenge response authentication
+  (http://pajhome.org.uk/crypt/md5/advancedauth.html#alternative) through the
+  pychap.py helper module.
+
+- A wsgi *like* request/response session handler that uses parts of the webob
+  module to remove most of the work of handling the special brand of
+  JSONRequest (http://www.json.org/JSONRequest.html) that this implementation
+  uses.
+
+- A *mostly* coverage automated test suite using the unittest module.
