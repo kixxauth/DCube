@@ -66,9 +66,6 @@ class JSONRequest(unittest.TestCase):
     self.assertEqual(response.status, 400)
     tests.checkHeaders(response.getheaders(),
         tests.defaultHeaders(content_length=False))
-    self.assertEqual(response.read(),
-        ('invalid JSONRequest Content-Type %s from user agent %s' % \
-            (content_type, headers['User-Agent'])))
     cxn.close()
 
   def test_invalidAcceptHeader(self):
@@ -76,7 +73,7 @@ class JSONRequest(unittest.TestCase):
     cxn = tests.httpConnection()
     accept = 'text/html'
     headers = tests.getJSONRequestHeaders(accept=accept)
-    cxn.request('POST', '/', None, headers)
+    cxn.request('POST', '/', '', headers)
     response = cxn.getresponse()
     self.assertEqual(response.status, 406)
     tests.checkHeaders(response.getheaders(),
@@ -97,9 +94,6 @@ class JSONRequest(unittest.TestCase):
     self.assertEqual(response.status, 400)
     tests.checkHeaders(response.getheaders(),
         tests.defaultHeaders(content_length=False))
-    self.assertEqual(response.read(),
-        'invalid JSONRequest body from user agent %s' %
-            headers['User-Agent'])
 
     invalid_json = '[1,2,3]'
     cxn.request('POST', '/', invalid_json, headers)
