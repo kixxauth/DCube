@@ -1,3 +1,10 @@
+"""This module provides a session handler and api for each request to this DCube host.
+
+All capabilities available to request handlers should go through the session handler.
+
+This module is mainly an implementation of the protocol used by this DCube host
+for handling JSONRequest communication with DCube clients.
+"""
 import os
 import sys
 import re
@@ -13,15 +20,23 @@ import gate
 import pychap
 
 class StopSession(Exception):
+  """Exception class used to explicity end the call chain for a session.
+  """
   def __init__(self, val):
     self.value = val
   def __str__(self):
     return repr(self.value)
 
 class Pub():
+  """The public session api passed to handler functions. Defined in Session.().
+  """
   pass
 
 class Session():
+  """The main session handling class. The capabilities of this DCube host are
+  all exposed through an instance of this class to the request handler
+  functions.
+  """
   def __init__(self):
     env = dict(os.environ)
     env['wsgi.input'] = sys.stdin
@@ -50,6 +65,12 @@ class Session():
     self.user_groups = []
 
   def checkHandlers(self, url_mapping):
+    """Takes a url mapping list and does a regex match operation against the
+    current url.
+
+    If no matches are found the HTTP status is set to 404 and a StopSession
+    exception is thrown.
+    """
     for regexp, handlers in url_mapping:
       if not regexp.startswith('^'):
         regexp = '^' + regexp
@@ -124,6 +145,8 @@ class Session():
     return self
 
   def checkMethod(self):
+    """Check the RPC method called by the request and act accordingly.
+    """
     self.handler = self.handlers.get(self.json_req['head']['method'])
 
     # The handler object may be a tuple containing optional directives
@@ -138,6 +161,11 @@ class Session():
     return self
 
   def authenticate(self):
+    """Parse the authentication protocol and check the credentials against the stored
+    credentials for the given user and act accordingly.
+
+    Uses pychap module (pychap.py).
+    """
     # check for authentication credentials
     if len(self.json_req['head']['authorization']) is 0:
       msg = 'credentials required'
@@ -191,6 +219,10 @@ class Session():
     raise StopSession('authenticate')
 
   def callHandler(self):
+    """Call the directed handler, passing it the proper parameters.
+    """
+    # A Pub instance is meant implement the session api given to the request
+    # handler functions.
     pub = Pub()
     pub.username = self.username
     pub.url = self.path
@@ -206,9 +238,12 @@ class Session():
                            self.user_groups, interface)
 
     for h in self.handler:
+      # A handler can break the call chain by returning False, 0, or None
       if not h(pub, get_store_factory, *self.url_groups):
         break
 
+    # each handler called may modify the Pub object, affecting the JSONResponse
+    # output by this call to startResponse()
     self.startResponse()(self.createJSONResponse(status=pub.status,
                                   message=pub.message,
                                   creds=pub.authenticate,
@@ -216,21 +251,70 @@ class Session():
     return True
 
   def checkUsername(self, username):
+    """Utility to check for invalid characters in a username.
+    """
     return re.search('\W', username)
 
   # todo: allow more control over configuration of headers
   def startResponse(self, status=200, content_type='application/jsonrequest'):
+    """The start of an HTTP response.
+    Returns a function.
+    """
     return util._start_response(
         ('%d %s' %
           (status, webapp.Response.http_status_message(status))),
         [('Content-Type', content_type), ('cache-control', 'private'), ('expires', '-1')])
 
   def createJSONResponse(self, status=200, message='ok', creds=[], body=None):
+    """Utility for creating the JSONResponse text for a protocol request.
+    """
     return simplejson.dumps(dict(
         head=dict(status=status, message=message, authorization=creds),
         body=body))
 
 def start(url_mapping):
+  """Takes a url mapping list and starts a Session instance, taking the appropriate
+  actions and calling the defined handler functions.
+
+  args: url_mapping
+    A list of url directives.
+
+    Each item in the url mapping list must be a tuple that takes the form:
+    (regex, methods)
+
+    The 'methods' directive in each mapping list tuple must be a dictionary
+    that takes the form:
+    {method_name : handlers}
+    NOTE: method_name is not an HTTP method name, but an RPC method name as
+    defined by the protocol for this server.
+
+    The 'handlers' directive in each method directive must be a tuple that
+    takes the form:
+    (handler_functions, authentication_directive)
+    Where handler_functions is a list of handler functions that will be called
+    in the order given and authentication_directive is boolean indicating the
+    authentication level. If the authentication_directive is set to True, then
+    access will be given to users that do not yet exist.
+
+    example url_mapping:
+      [
+
+        ('/users/(\w*)',
+          {'PUT': ([users_base_handler, users_put_handler], True),
+           'GET': ([users_base_handler, users_get_handler], True),
+           'DELETE': ([users_base_handler, users_delete_handler], True)}),
+
+        ('/',
+          {'GET': ([base_handler], True)})
+
+        ]
+
+    In this example a request to /users/foo 'PUT' RPC method would first call
+    users_base_handler (with 'foo' as the extra argument) and then
+    users_put_handler with the same arguments. Since the authentication
+    directive is set to True, users that do not yet exist would be given access
+    to the 'PUT' capabilities of this url.
+  """
   try:
     Session().\
         checkHandlers(url_mapping).\

@@ -1,3 +1,6 @@
+"""This is just a handler script that returns an http response to a request for
+robots.txt. The url that activates this script is configured in app.yaml
+"""
 def main():
   body = 'User-agent: *\nDisallow: /'
   print 'Status: 200 OK' 

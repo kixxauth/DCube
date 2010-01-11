@@ -1,3 +1,8 @@
+#
+# A list of datastore interfaces and the groups that have permission on each one.
+# Used by the gate module (gate.py)
+#
+
 create_new_user:
 - users
 get_public_user:
