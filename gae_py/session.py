@@ -1,9 +1,66 @@
-"""This module provides a session handler and api for each request to this DCube host.
+"""This module provides a session handler api for each request to this DCube host.
 
-All capabilities available to request handlers should go through the session handler.
+All capabilities available to request handlers should go through this session
+handler module.
 
 This module is mainly an implementation of the protocol used by this DCube host
 for handling JSONRequest communication with DCube clients.
+
+DCube Protocol 1.0
+------------------
+All HTTP requests made to DCube must conform to the
+[JSONRequest][http://www.json.org/JSONRequest.html] specification and must be
+HTTP POST requests.
+
+### Request
+The JSON text in the request message body must represent a dictionary object of
+the following form:
+    {
+      "head":{"method":"GET | PUT", "authorization":[username, cnonce, response]},
+      "body": body_object
+    }
+Where `username` is a user name string, `cnonce` is client computed nonce
+string, `response` is client computed passkey string, and `body_object` is
+either a representation of an object to PUT in the datastore or query
+instructions for a GET request.
+
+### Response
+The JSON text in the response message body must represent a dictionary object
+of the following form:
+    {
+      "head":{
+        "status":status_code,
+        "message":message_string,
+        "authorization":[username, nonce, nextnonce]},
+      "body": body_object
+    }
+Where `username` is a user name string, `nonce` is server computed nonce
+string, `nextnonce` is a different server computed nonce string, and
+`body_object` is either a representation of objects matched in a qeury, the
+representation of an object that was PUT in the datastore, or empty.
+
+### Query (GET request body_object)
+The body_object for a datastore query must be included in the JSON text of the
+HTTP request message body and must represent a list object of the following
+form:
+    [
+      [attribute_name, filter, value],...
+    ]
+Where `attribute_name` is the name of the attribute to filter the query on,
+`filter` is one of "=", ">", "<", and value is the value to compare against.
+Only one attribute in the query is allowed to contain inequality filters.
+
+### Put (PUT request body_object)
+The body_object for a put operation to the datastore must be included in the
+JSON text of the HTTP request message body and represent an object of the
+following form:
+    {
+      "index":[[attribute_name, value],...],
+      "entity": entity_object
+    }
+Where `attribute_name` is the name of an attribute to index, `value` is a value
+to index for `attribute_name`, and `entity_object` is any object that may be
+represented by JSON text.
 """
 import os
 import sys
@@ -87,8 +144,9 @@ class Session():
     raise StopSession(msg)
 
   def buildJSONRequest(self):
-    # todo: support other HTTP methods (except PUT and DELETE)
-    # JSONRequest protocol only allows GET and POST HTTP methods
+    """Decode and load the JSON text HTTP message body.
+    """
+    # todo: Only test for POST
     if self.http_method != 'GET' and self.http_method != 'POST':
       msg = 'invalid JSONRequest method %s from user agent %s' % \
           (self.http_method, self.user_agent)
@@ -161,8 +219,8 @@ class Session():
     return self
 
   def authenticate(self):
-    """Parse the authentication protocol and check the credentials against the stored
-    credentials for the given user and act accordingly.
+    """Validate against the authentication protocol and check the credentials
+    against the stored credentials for the given user and act accordingly.
 
     Uses pychap module (pychap.py).
     """

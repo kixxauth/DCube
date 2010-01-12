@@ -13,6 +13,7 @@ In effect, this implementation of DCube just exposes a [JSONRequest][3] API that
 gives users access to Google App Engine distrubuted datastore.
 
 ### This DCube host is implemented in Python on Google App Engine service platform.
+The DCube protocol is defined in the source documentation of `/gae_py/session.py`.
 
 ### DCube is sponsored by [The Fireworks Project](http://www.fireworksproject.com).
 
