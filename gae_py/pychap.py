@@ -41,10 +41,9 @@ class ChapUser():
 
 def createNonce(username):
   """Utility used to create unique, un-guessable strings."""
-  return hmac.new(
-      str(datetime.datetime.utcnow()) + username,
-      str(random.randint(0, 9999)),
-      hashlib.sha1).hexdigest()
+  k = str(datetime.datetime.utcnow()) + username
+  s = str(random.randint(0, 9999))
+  return hmac.new(k.encode('ascii'), s.encode('ascii'), hashlib.sha1).hexdigest()
 
 def authenticate(putuser,
                  username=None,
