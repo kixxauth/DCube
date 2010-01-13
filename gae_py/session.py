@@ -89,6 +89,7 @@ class Pub():
   """
   pass
 
+# todo: Should Session be private?
 class Session():
   """The main session handling class. The capabilities of this DCube host are
   all exposed through an instance of this class to the request handler
@@ -104,20 +105,29 @@ class Session():
     env['wsgi.multithread'] = False
     env['wsgi.multiprocess'] = False
 
+    self.log = {'user-agent': env.get('HTTP_USER_AGENT')}
+
     wr = webob.Request(env, charset='utf-8',
         unicode_errors='ignore', decode_param_names=True)
+
+    self.path = wr.path
+    self.http_req_method = env.get('REQUEST_METHOD')
+    self.user_agent = env.get('HTTP_USER_AGENT')
+    self.req_content_type = wr.headers.get('Content-Type')
+    self.req_accept = wr.headers.get('Accept')
+    self.http_req_body = wr.body
+
+    self.http_status = 200
+    # http_headers should only be accessed through Session.set_http_header()
+    self.http_headers = {'CONTENT-TYPE':'application/jsonrequest',
+        'CACHE-CONTROL':'private', 'EXPIRES':'-1'}
+    self.http_res_body = None
 
     self.username = None
     self.handlers = None
     self.handler = None
     self.url_groups = None
     self.allow_none_user = False
-    self.user_agent = env.get('HTTP_USER_AGENT')
-    self.http_method = env.get('REQUEST_METHOD')
-    self.content_type = wr.headers.get('Content-Type')
-    self.accept = wr.headers.get('Accept')
-    self.http_body = wr.body
-    self.path = wr.path
     self.auth_user = {'nonce': None, 'nextnonce': None}
     self.user_groups = []
 
@@ -139,33 +149,36 @@ class Session():
         self.url_groups = match.groups()
         return self
 
-    msg = 'the url "%s" could not be found on this host.' % self.path
-    self.startResponse(status=404, content_type='text/plain')(msg)
-    raise StopSession(msg)
+    self.http_res_body = 'the url "%s" could not be found on this host.' % self.path
+    self.http_status = 404
+    self.set_http_header('Content-Type', 'text/plain')
+    self.sendResponse()
+    #self.startResponse(status=404, req_content_type='text/plain')(self.log['err'])
+    raise StopSession(self.http_res_body)
 
   def buildJSONRequest(self):
     """Decode and load the JSON text HTTP message body.
     """
     # todo: Only test for POST
-    if self.http_method != 'GET' and self.http_method != 'POST':
+    if self.http_req_method != 'GET' and self.http_req_method != 'POST':
       msg = 'invalid JSONRequest method %s from user agent %s' % \
-          (self.http_method, self.user_agent)
+          (self.http_req_method, self.user_agent)
       logging.info(msg)
       self.startResponse(status=405)
       raise StopSession(msg)
 
     # check content-type request header to meet JSONRequest spec
-    if self.content_type != 'application/jsonrequest':
+    if self.req_content_type != 'application/jsonrequest':
       msg = 'invalid JSONRequest Content-Type %s from user agent %s' % \
-          (self.content_type, self.user_agent)
+          (self.req_content_type, self.user_agent)
       logging.info(msg)
       self.startResponse(status=400)(msg)
       raise StopSession(msg)
 
     # check accept request header to meet JSONRequest spec
-    if self.accept != 'application/jsonrequest':
+    if self.req_accept != 'application/jsonrequest':
       msg = 'invalid JSONRequest Accept header %s from user agent %s' % \
-          (self.accept, self.user_agent)
+          (self.req_accept, self.user_agent)
       logging.info(msg)
       self.startResponse(status=406)(msg)
       raise StopSession(msg)
@@ -173,7 +186,7 @@ class Session():
     # load request body JSON
     json_req = None
     try:
-      json_req = simplejson.loads(self.http_body)
+      json_req = simplejson.loads(self.http_req_body)
     except:
       msg = 'invalid JSONRequest body from user agent %s' % self.user_agent
       logging.info(msg)
@@ -313,15 +326,29 @@ class Session():
     """
     return re.search('\W', username)
 
+  def sendResponse(self):
+    util._start_response(
+        ('%d %s' %
+          (self.http_status, webapp.Response.http_status_message(self.http_status))),
+        self.http_headers.items())(self.http_res_body)
+
   # todo: allow more control over configuration of headers
-  def startResponse(self, status=200, content_type='application/jsonrequest'):
+  def startResponse(self, status=200, req_content_type='application/jsonrequest'):
     """The start of an HTTP response.
     Returns a function.
     """
     return util._start_response(
         ('%d %s' %
           (status, webapp.Response.http_status_message(status))),
-        [('Content-Type', content_type), ('cache-control', 'private'), ('expires', '-1')])
+        [('Content-Type', req_content_type), ('cache-control', 'private'), ('expires', '-1')])
+
+  def set_http_header(self, name, value):
+    """Use Session.set_http_header() instead of accessing  Session.http_headers directly.
+
+    This prevents making the easy programming error of Session.http_headers['Content-Type'] and
+    Session.http_headers['content-type'] pointing to different values.
+    """
+    self.http_headers[name.upper()] = value
 
   def createJSONResponse(self, status=200, message='ok', creds=[], body=None):
     """Utility for creating the JSONResponse text for a protocol request.
