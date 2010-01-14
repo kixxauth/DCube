@@ -4,7 +4,7 @@
 
 # The name and version of the application
 application: fireworks-skylight 
-version: 5
+version: 0-1-1
 
 # The App Engine runtime api specification
 runtime: python
@@ -22,6 +22,12 @@ handlers:
 - url: /environs
   script: environs.py
 
+  # Set up for user testing
+  # ON LOCAL dev_appserver ONLY !!! (security)
+- url: /testsetup
+  script: testsetup.py
+
   # All other requests are sent to request.py
 - url: /.*
   script: request.py
+

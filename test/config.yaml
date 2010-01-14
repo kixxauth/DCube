@@ -1,12 +1,19 @@
 full:
 - module: basic
   classes:
+
   - name: RobotsTxt
     tests:
     - test_robotsTxt
+
   - name: NotFound
     tests:
     - test_notFound
+
+  - name: SetupTestUsers
+    tests:
+    - test_access
+
   - name: JSONRequest
     tests:
     - test_invalidMethods
@@ -14,18 +21,22 @@ full:
     - test_invalidAcceptHeader
     - test_invalidJSONRequestBody
     - test_invalids
+
 - module: users
   classes:
+
   - name: UsersURL
     tests:
     - test_methodNotAllowed
     - test_noUserURL
     - test_usernameNotMatch
+
   - name: ExistingUser
     tests:
     - test_getUser
     - test_putUser
     - test_deleteUser
+
   - name: NoUser
     tests:
     - test_getUser

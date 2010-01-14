@@ -34,6 +34,16 @@ class NotFound(unittest.TestCase):
         'the url "/foo" could not be found on this host.')
     cxn.close()
 
+class SetupTestUsers(unittest.TestCase):
+  def test_access(self):
+    """Check for proper access restrictions on /testsetup"""
+    local = (tests.HOST is tests.LOCALHOST)
+    cxn = tests.httpConnection()
+    cxn.request('GET', '/testsetup')
+    response = cxn.getresponse()
+    self.assertEqual(response.status, (local and 204 or 403))
+    cxn.close()
+
 # todo: check other URLs for JSONRequest compatability
 class JSONRequest(unittest.TestCase):
   def test_invalidMethods(self):
