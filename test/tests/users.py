@@ -145,7 +145,7 @@ class ExistingUser(unittest.TestCase):
         *json_response['head']['authorization'])
 
     json_response = tests.makeRequest(
-        url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
+        url=(URL_USERS + tests.USERNAME), method='put', creds=creds)
 
     self.assertEqual(json_response['head']['status'], 200)
     self.assertEqual(json_response.get('body'),
@@ -210,3 +210,35 @@ class NoUser(unittest.TestCase):
         'deleted user "%s"'% tests.USERNAME)
     self.assertEqual(json_response['head']['authorization'], [])
     self.assertEqual(json_response.get('body'), None)
+
+class PrivUsers(unittest.TestCase):
+  def setUp(self):
+    createUser(tests.USERNAME)
+
+  def tearDown(self):
+    removeUser(tests.USERNAME, tests.PASSKEY)
+
+  def test_base(self):
+    """Test priv user capabilities for base user"""
+    passkey = 'secret_passkey'
+    priv_users = [
+          'test_sys_admin',
+          'test_user_admin',
+          'test_account_admin',
+          'test_database_admin'
+        ]
+
+    for username in priv_users:
+      # authenticate by calling the root domain url
+      json_response = tests.makeRequest(method='get', creds=[username])
+      creds = tests.createCredentials(passkey,
+          *json_response['head']['authorization'])
+
+      # get the base user
+      json_response = tests.makeRequest(
+          url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
+      target_user = json_response['body']
+      creds = tests.createCredentials(passkey,
+          *json_response['head']['authorization'])
+
+      methods = ['put','get','delete']

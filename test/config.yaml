@@ -42,3 +42,7 @@ full:
     - test_getUser
     - test_putUser
     - test_deleteUser
+
+  - name: PrivUsers
+    tests:
+    - test_base
