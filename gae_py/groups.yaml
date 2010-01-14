@@ -3,15 +3,16 @@
 # Used by the gate module (gate.py)
 #
 
-create_new_user:
-- users
-get_public_user:
-- users
-delete_user:
-- users
-get_chap_user_creds:
-- ROOT
-get_user_groups:
-- ROOT
-update_chap_user_creds:
-- ROOT
+users:
+  level: 0
+  interfaces:
+  - create_new_user
+  - get_public_user
+  - delete_user
+
+ROOT:
+  level: 100
+  interfaces:
+  - get_chap_user_creds
+  - get_user_groups
+  - update_chap_user_creds
