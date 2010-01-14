@@ -105,7 +105,7 @@ class Session():
     env['wsgi.multithread'] = False
     env['wsgi.multiprocess'] = False
 
-    self.log = {'user-agent': env.get('HTTP_USER_AGENT')}
+    self.log = {}
 
     wr = webob.Request(env, charset='utf-8',
         unicode_errors='ignore', decode_param_names=True)
@@ -121,7 +121,7 @@ class Session():
     # http_headers should only be accessed through Session.set_http_header()
     self.http_headers = {'CONTENT-TYPE':'application/jsonrequest',
         'CACHE-CONTROL':'private', 'EXPIRES':'-1'}
-    self.http_res_body = None
+    self.http_res_body = ''
 
     self.username = None
     self.handlers = None
@@ -149,11 +149,11 @@ class Session():
         self.url_groups = match.groups()
         return self
 
-    self.http_res_body = 'the url "%s" could not be found on this host.' % self.path
+    self.log['warn'] = 'the url "%s" could not be found on this host.' % self.path
+    self.http_res_body = self.log['warn']
     self.http_status = 404
     self.set_http_header('Content-Type', 'text/plain')
     self.sendResponse()
-    #self.startResponse(status=404, req_content_type='text/plain')(self.log['err'])
     raise StopSession(self.http_res_body)
 
   def buildJSONRequest(self):
@@ -161,57 +161,64 @@ class Session():
     """
     # todo: Only test for POST
     if self.http_req_method != 'GET' and self.http_req_method != 'POST':
-      msg = 'invalid JSONRequest method %s from user agent %s' % \
-          (self.http_req_method, self.user_agent)
-      logging.info(msg)
-      self.startResponse(status=405)
-      raise StopSession(msg)
+      self.log['warn'] = 'invalid JSONRequest method %s' % self.http_req_method
+      self.http_status = 405
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     # check content-type request header to meet JSONRequest spec
     if self.req_content_type != 'application/jsonrequest':
-      msg = 'invalid JSONRequest Content-Type %s from user agent %s' % \
-          (self.req_content_type, self.user_agent)
-      logging.info(msg)
-      self.startResponse(status=400)(msg)
-      raise StopSession(msg)
+      self.log['warn'] = ('invalid JSONRequest Content-Type %s' % 
+          self.req_content_type)
+      self.http_status = 400
+      self.http_res_body = self.log['warn']
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     # check accept request header to meet JSONRequest spec
     if self.req_accept != 'application/jsonrequest':
-      msg = 'invalid JSONRequest Accept header %s from user agent %s' % \
-          (self.req_accept, self.user_agent)
-      logging.info(msg)
-      self.startResponse(status=406)(msg)
-      raise StopSession(msg)
+      self.log['warn'] = ('invalid JSONRequest Accept header %s' %
+          self.req_accept)
+      self.http_status = 406
+      self.http_res_body = self.log['warn']
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     # load request body JSON
     json_req = None
     try:
       json_req = simplejson.loads(self.http_req_body)
     except:
-      msg = 'invalid JSONRequest body from user agent %s' % self.user_agent
-      logging.info(msg)
-      self.startResponse(status=400)(msg)
-      raise StopSession(msg)
+      self.log['warn'] = 'invalid JSONRequest body'
+      self.http_status = 400
+      self.http_res_body = self.log['warn']
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     if not isinstance(json_req, dict):
-      msg = 'invalid JSON body'
-      self.startResponse()(self.createJSONResponse(status=400, message=msg))
-      raise StopSession(msg)
+      self.log['warn'] = 'invalid JSON body'
+      self.http_res_body = self.createJSONResponse(status=400,
+          message=self.log['warn'])
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     head = (isinstance(json_req.get('head'), dict) and \
         json_req['head'] or {'method': 'GET', 'authorization': []})
 
     if not isinstance(head.get('method'), basestring):
       method = (head.get('method') is None) and 'null' or head.get('method')
-      msg = 'invalid method "%s"' % method
-      self.startResponse()(self.createJSONResponse(status=405,
-        message=('invalid method "%s"' % method)))
-      raise StopSession(msg)
+      self.log['warn'] = 'invalid method "%s"' % method
+      self.http_res_body = self.createJSONResponse(status=405,
+        message=self.log['warn'])
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     auth = head.get('authorization')
     self.json_req = dict(head={'method': head['method'].upper(),
                'authorization': isinstance(auth, list) and auth or []},
          body=json_req.get('body'))
+
+    self.log['method'] = head.get('method')
 
     return self
 
@@ -225,9 +232,10 @@ class Session():
       self.handler, self.allow_none_user = self.handler
 
     if not isinstance(self.handler, list):
-      msg = '"%s" method not allowed' % self.json_req['head']['method']
-      self.startResponse()(self.createJSONResponse(status=405, message=msg))
-      raise StopSession(msg)
+      self.log['warn'] = '"%s" method not allowed' % self.json_req['head']['method']
+      self.http_res_body = self.createJSONResponse(status=405, message=self.log['warn'])
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     return self
 
@@ -239,24 +247,19 @@ class Session():
     """
     # check for authentication credentials
     if len(self.json_req['head']['authorization']) is 0:
-      msg = 'credentials required'
-      self.startResponse()(self.createJSONResponse(status=401, message=msg))
-      raise StopSession(msg)
+      self.log['warn'] = 'credentials required'
+      self.http_res_body = self.createJSONResponse(status=401, message=self.log['warn'])
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     # check the username
     username = self.json_req['head']['authorization'][0]
-    if not isinstance(username, basestring):
+    if not isinstance(username, basestring) or self.checkUsername(username):
       username = (username is None) and 'null' or username 
-      msg = 'invalid username "%s"' % username
-      self.startResponse()(self.createJSONResponse(status=401, message=msg))
-      raise StopSession(msg)
-
-    # todo: join with conditional above
-    if self.checkUsername(username):
-      username = (username is None) and 'null' or username 
-      msg = 'invalid username "%s"' % username
-      self.startResponse()(self.createJSONResponse(status=401, message=msg))
-      raise StopSession(msg)
+      self.log['warn'] = 'invalid username "%s"' % username
+      self.http_res_body = self.createJSONResponse(status=401, message=self.log['warn'])
+      self.sendResponse()
+      raise StopSession(self.log['warn'])
 
     chap_user = gate.get_builder(
         username, ['ROOT'], 'get_chap_user_creds')()
@@ -285,9 +288,11 @@ class Session():
         (auth_user.message is pychap.USER_NA and self.allow_none_user):
           return self
 
-    self.startResponse()(self.createJSONResponse(status=401, message='authenticate',
-      creds=[username, auth_user.nonce, auth_user.nextnonce]))
-    raise StopSession('authenticate')
+    self.log['warn'] = 'un-authenticated'
+    self.http_res_body = self.createJSONResponse(status=401, message='authenticate',
+      creds=[username, auth_user.nonce, auth_user.nextnonce])
+    self.sendResponse()
+    raise StopSession(self.log['warn'])
 
   def callHandler(self):
     """Call the directed handler, passing it the proper parameters.
@@ -308,6 +313,7 @@ class Session():
       return gate.get_builder(self.username,
                            self.user_groups, interface)
 
+    # todo: Wrap in a try block
     for h in self.handler:
       # A handler can break the call chain by returning False, 0, or None
       if not h(pub, get_store_factory, *self.url_groups):
@@ -315,10 +321,12 @@ class Session():
 
     # each handler called may modify the Pub object, affecting the JSONResponse
     # output by this call to startResponse()
-    self.startResponse()(self.createJSONResponse(status=pub.status,
+    self.log['status'] = pub.status
+    self.http_res_body = self.createJSONResponse(status=pub.status,
                                   message=pub.message,
                                   creds=pub.authenticate,
-                                  body=pub.body))
+                                  body=pub.body)
+    self.sendResponse()
     return True
 
   def checkUsername(self, username):
@@ -331,16 +339,6 @@ class Session():
         ('%d %s' %
           (self.http_status, webapp.Response.http_status_message(self.http_status))),
         self.http_headers.items())(self.http_res_body)
-
-  # todo: allow more control over configuration of headers
-  def startResponse(self, status=200, req_content_type='application/jsonrequest'):
-    """The start of an HTTP response.
-    Returns a function.
-    """
-    return util._start_response(
-        ('%d %s' %
-          (status, webapp.Response.http_status_message(status))),
-        [('Content-Type', req_content_type), ('cache-control', 'private'), ('expires', '-1')])
 
   def set_http_header(self, name, value):
     """Use Session.set_http_header() instead of accessing  Session.http_headers directly.
@@ -400,12 +398,15 @@ def start(url_mapping):
     directive is set to True, users that do not yet exist would be given access
     to the 'PUT' capabilities of this url.
   """
+  session = Session()
   try:
-    Session().\
+    session.\
         checkHandlers(url_mapping).\
         buildJSONRequest().\
         checkMethod().\
         authenticate().\
         callHandler()
   except StopSession:
+    pass
+  finally:
     pass
