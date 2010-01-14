@@ -335,6 +335,10 @@ class Session():
     return re.search('\W', username)
 
   def sendResponse(self):
+    logging.info('REQUEST %s %d %s',
+        (self.log.get('method') or 'na'),
+        (self.log.get('status') or 500),
+        (self.log.get('warn') or 'ok'))
     util._start_response(
         ('%d %s' %
           (self.http_status, webapp.Response.http_status_message(self.http_status))),
