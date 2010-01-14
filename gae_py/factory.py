@@ -11,7 +11,7 @@ import pychap
 
 import logging
 
-def get_chap_user_creds(username, groups):
+def get_chap_user_creds(username, level):
   """Returns a function that will return authentication attributes for the
   given user.
   """
@@ -23,7 +23,7 @@ def get_chap_user_creds(username, groups):
             passkey=user.passkey)
   return getChapUserCreds
 
-def update_chap_user_creds(username, groups):
+def update_chap_user_creds(username, level):
   """Returns a function that will allow its caller to update authentication
   attributes for a user in the datastore.
   """
@@ -36,7 +36,7 @@ def update_chap_user_creds(username, groups):
       store.putBaseUser(**user.__dict__)
   return updateChapUserCreds
 
-def get_user_groups(username, groups):
+def get_user_groups(username, level):
   """Returns a function that will return the group membership list for the
   given username.
   """
@@ -44,7 +44,7 @@ def get_user_groups(username, groups):
     return store.getBaseUser(username).groups
   return getUserGroups
 
-def create_new_user(username, groups):
+def create_new_user(username, level):
   """Returns a function that allows its caller to create a new user entity in
   the datastore.
   """
@@ -59,7 +59,7 @@ def create_new_user(username, groups):
 
   return createNewUser
 
-def get_public_user(username, groups):
+def get_public_user(username, level):
   """Returns a function that will return the "public" attribes of the given
   user in the form of a dictionary.
   """
@@ -70,7 +70,7 @@ def get_public_user(username, groups):
     return {'username': username, 'groups': user.groups}
   return getPublicUser
 
-def delete_user(username, groups):
+def delete_user(username, level):
   def deleteUser():
     store.deleteBaseUser(username)
   return deleteUser
