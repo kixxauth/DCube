@@ -76,7 +76,11 @@ def get_public_user(loggedin_username, level):
 
   return getPublicUser
 
+# todo: This needs to return something more useful than False.
 def update_public_user(loggedin_username, level):
+  """Returns a function that allows the caller to update a user provided the
+  permission level requirements are met.
+  """
   def updatePublicUser(user):
     stored_user = store.getBaseUser(user['username'])
 
@@ -90,6 +94,8 @@ def update_public_user(loggedin_username, level):
 
       # can the logged in user update these groups?
       for g in groups:
+        if GROUPS.get(g) is None:
+          return False
         if not g in stored_user.groups and \
             not level > GROUPS[g]['level']:
               return False

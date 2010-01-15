@@ -253,10 +253,60 @@ class PrivUsers_BaseUser(unittest.TestCase):
     self.assertEqual(json_response.get('body'),
         {'username': tests.USERNAME, 'groups': ['users','database']})
 
+    target_user['groups'] = ['users','account_admin']
+    creds = tests.createCredentials(passkey,
+        *json_response['head']['authorization'])
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='put', creds=creds, body=target_user)
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+        {'username': tests.USERNAME, 'groups': ['users','account_admin']})
+
+    target_user['groups'] = ['users','account_admin', 'user_admin']
+    creds = tests.createCredentials(passkey,
+        *json_response['head']['authorization'])
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='put', creds=creds, body=target_user)
+
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response.get('body'),
+        {'username': tests.USERNAME, 'groups': ['users','account_admin', 'user_admin']})
+
+    # cannot make a user a member of sys_admin group
+    target_user['groups'] = ['users','sys_admin', 'user_admin']
+    creds = tests.createCredentials(passkey,
+        *json_response['head']['authorization'])
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='put', creds=creds, body=target_user)
+
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response.get('body'), None)
+
+    # cannot make a user a member of ROOT group
+    target_user['groups'] = ['users','sys_admin', 'ROOT']
+    creds = tests.createCredentials(passkey,
+        *json_response['head']['authorization'])
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='put', creds=creds, body=target_user)
+
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response.get('body'), None)
+
+    # cannot make a user a member of a group that does not exist
+    target_user['groups'] = ['users','non_group', 'user_admin']
+    creds = tests.createCredentials(passkey,
+        *json_response['head']['authorization'])
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='put', creds=creds, body=target_user)
+
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response.get('body'), None)
+
     # get it back
     creds = tests.createCredentials(passkey,
         *json_response['head']['authorization'])
     json_response = tests.makeRequest(
         url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
-    self.assertEqual(json_response['body'].get('groups'), ['users','database'])
+    self.assertEqual(json_response['body'].get('groups'), ['users','account_admin','user_admin'])
 
