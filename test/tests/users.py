@@ -221,92 +221,95 @@ class NoUser(unittest.TestCase):
 
 class PrivUsers_BaseUser(unittest.TestCase):
   def setUp(self):
-    createUser(tests.USERNAME)
+    self.nonce, self.nextnonce = createUser(tests.USERNAME)
 
   def tearDown(self):
     removeUser(tests.USERNAME, tests.PASSKEY)
 
+  def makeUserRequest(self, *a, **k):
+    creds = tests.createCredentials(k['passkey'], k['username'], k['nonce'], k['nextnonce'])
+    return tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method=k['method'], creds=creds, body=k['body'])
+
+  def getUser(self, passkey, username, nonce, nextnonce):
+    return self.makeUserRequest(method='get',
+        body=None, passkey=passkey, username=username,
+        nonce=nonce, nextnonce=nextnonce)
+
+  def putUser(self, body, passkey, username, nonce, nextnonce):
+    return self.makeUserRequest(method='put',
+        body=body, passkey=passkey, username=username,
+        nonce=nonce, nextnonce=nextnonce)
+
+  def test_invalidGroup(self):
+    """try to update user with invalid group name"""
+    response = self.getUser(
+        tests.PASSKEY, tests.USERNAME, self.nonce, self.nextnonce)
+    response['body']['groups'] = ['users','non_group']
+    response = self.putUser(response['body'], tests.PASSKEY,
+        *response['head']['authorization'])
+
+    self.assertEqual(response['head']['status'], 403)
+    self.assertEqual(response.get('body'), None)
+
   def test_sys_admin(self):
     """sys_admin updates base test_user"""
-    passkey = 'secret_passkey'
     username = 'test_sys_admin'
+    passkey = 'secret'
 
     # authenticate by calling the root domain url
-    json_response = tests.makeRequest(method='get', creds=[username])
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
+    response = tests.makeRequest('/', 'get', [username])
 
     # get the base user
-    json_response = tests.makeRequest(
-        url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
-    target_user = json_response['body']
-    self.assertEqual(target_user.get('groups'), ['users'])
+    response = self.getUser(passkey, *response['head']['authorization'])
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users'])
 
     # modify the group
-    target_user['groups'] = ['users','database']
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
-        method='put', creds=creds, body=target_user)
+    test_user['groups'] = ['users','database']
+    response = self.putUser(test_user, passkey,
+        *response['head']['authorization'])
+    test_user = response['body']
 
-    self.assertEqual(json_response['head']['status'], 200)
-    self.assertEqual(json_response.get('body'),
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(test_user,
         {'username': tests.USERNAME, 'groups': ['users','database']})
 
-    target_user['groups'] = ['users','account_admin']
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
-        method='put', creds=creds, body=target_user)
+    test_user['groups'] = ['users','account_admin']
+    response = self.putUser(test_user, passkey,
+        *response['head']['authorization'])
+    test_user = response['body']
 
-    self.assertEqual(json_response['head']['status'], 200)
-    self.assertEqual(json_response.get('body'),
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(test_user,
         {'username': tests.USERNAME, 'groups': ['users','account_admin']})
 
-    target_user['groups'] = ['users','account_admin', 'user_admin']
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
-        method='put', creds=creds, body=target_user)
+    test_user['groups'] = ['users','account_admin', 'user_admin']
+    response = self.putUser(test_user, passkey,
+        *response['head']['authorization'])
+    test_user = response['body']
 
-    self.assertEqual(json_response['head']['status'], 200)
-    self.assertEqual(json_response.get('body'),
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(test_user,
         {'username': tests.USERNAME, 'groups': ['users','account_admin', 'user_admin']})
 
     # cannot make a user a member of sys_admin group
-    target_user['groups'] = ['users','sys_admin', 'user_admin']
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
-        method='put', creds=creds, body=target_user)
+    response['body']['groups'] = ['users','sys_admin', 'user_admin']
+    response = self.putUser(response['body'], passkey,
+        *response['head']['authorization'])
 
-    self.assertEqual(json_response['head']['status'], 403)
-    self.assertEqual(json_response.get('body'), None)
+    self.assertEqual(response['head']['status'], 403)
+    self.assertEqual(response.get('body'), None)
 
     # cannot make a user a member of ROOT group
-    target_user['groups'] = ['users','sys_admin', 'ROOT']
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
-        method='put', creds=creds, body=target_user)
+    test_user['groups'] = ['users','sys_admin', 'ROOT']
+    response = self.putUser(test_user, passkey,
+        *response['head']['authorization'])
 
-    self.assertEqual(json_response['head']['status'], 403)
-    self.assertEqual(json_response.get('body'), None)
-
-    # cannot make a user a member of a group that does not exist
-    target_user['groups'] = ['users','non_group', 'user_admin']
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
-        method='put', creds=creds, body=target_user)
-
-    self.assertEqual(json_response['head']['status'], 403)
-    self.assertEqual(json_response.get('body'), None)
+    self.assertEqual(response['head']['status'], 403)
+    self.assertEqual(response.get('body'), None)
 
     # get it back
-    creds = tests.createCredentials(passkey,
-        *json_response['head']['authorization'])
-    json_response = tests.makeRequest(
-        url=(URL_USERS + tests.USERNAME), method='get', creds=creds)
-    self.assertEqual(json_response['body'].get('groups'), ['users','account_admin','user_admin'])
+    response = self.getUser(passkey, *response['head']['authorization'])
+    self.assertEqual(response['body'].get('groups'), ['users','account_admin','user_admin'])
 

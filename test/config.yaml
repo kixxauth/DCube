@@ -44,4 +44,5 @@ full:
 
   - name: PrivUsers_BaseUser
     tests:
+    - test_invalidGroup
     - test_sys_admin
