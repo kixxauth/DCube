@@ -220,6 +220,13 @@ class NoUser(unittest.TestCase):
     self.assertEqual(json_response.get('body'), None)
 
 class PrivUsers_BaseUser(unittest.TestCase):
+  groups = [
+      'database',
+      'account_admin',
+      'user_admin',
+      'sys_admin',
+      'ROOT']
+
   def setUp(self):
     self.nonce, self.nextnonce = createUser(tests.USERNAME)
 
@@ -241,6 +248,25 @@ class PrivUsers_BaseUser(unittest.TestCase):
         body=body, passkey=passkey, username=username,
         nonce=nonce, nextnonce=nextnonce)
 
+  def updateGroup(self, user, group, passkey, auth, msg, will_pass=False):
+    user['groups'] = ['users', group]
+    response = self.putUser(user, passkey, *auth)
+
+    if will_pass:
+      self.assertEqual(response['head']['status'], 200,
+          '%s got:%d expected:403'% (msg, response['head']['status']))
+      self.assertEqual(response['body']['groups'], ['users', group],
+          ('%s got:%s expected:%s'%
+            (msg, response['body']['groups'], ['users', group])))
+
+    else:
+      self.assertEqual(response['head']['status'], 403,
+          '%s got:%d expected:403'% (msg, response['head']['status']))
+      self.assertEqual(response.get('body'), None,
+          '%s got:%s expected:None'% (msg, response.get('body')))
+
+    return response['head']['authorization']
+
   def test_invalidGroup(self):
     """try to update user with invalid group name"""
     response = self.getUser(
@@ -251,6 +277,28 @@ class PrivUsers_BaseUser(unittest.TestCase):
 
     self.assertEqual(response['head']['status'], 403)
     self.assertEqual(response.get('body'), None)
+
+  def test_baseUser(self):
+    """base test user updates self"""
+    username = tests.USERNAME
+    passkey = tests.PASSKEY
+
+    # authenticate by calling the root domain url
+    response = tests.makeRequest('/', 'get', [username])
+
+    # get the base user
+    response = self.getUser(passkey, *response['head']['authorization'])
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users'])
+
+    auth = response['head']['authorization']
+    for g in self.groups:
+      auth = self.updateGroup(
+          test_user, g, passkey, auth, 'test_user updates %s'% g)
+
+    # get it back
+    response = self.getUser(passkey, *auth)
+    self.assertEqual(response['body'].get('groups'), ['users'])
 
   def test_sys_admin(self):
     """sys_admin updates base test_user"""
@@ -265,51 +313,14 @@ class PrivUsers_BaseUser(unittest.TestCase):
     test_user = response['body']
     self.assertEqual(test_user.get('groups'), ['users'])
 
-    # modify the group
-    test_user['groups'] = ['users','database']
-    response = self.putUser(test_user, passkey,
-        *response['head']['authorization'])
-    test_user = response['body']
 
-    self.assertEqual(response['head']['status'], 200)
-    self.assertEqual(test_user,
-        {'username': tests.USERNAME, 'groups': ['users','database']})
-
-    test_user['groups'] = ['users','account_admin']
-    response = self.putUser(test_user, passkey,
-        *response['head']['authorization'])
-    test_user = response['body']
-
-    self.assertEqual(response['head']['status'], 200)
-    self.assertEqual(test_user,
-        {'username': tests.USERNAME, 'groups': ['users','account_admin']})
-
-    test_user['groups'] = ['users','account_admin', 'user_admin']
-    response = self.putUser(test_user, passkey,
-        *response['head']['authorization'])
-    test_user = response['body']
-
-    self.assertEqual(response['head']['status'], 200)
-    self.assertEqual(test_user,
-        {'username': tests.USERNAME, 'groups': ['users','account_admin', 'user_admin']})
-
-    # cannot make a user a member of sys_admin group
-    response['body']['groups'] = ['users','sys_admin', 'user_admin']
-    response = self.putUser(response['body'], passkey,
-        *response['head']['authorization'])
-
-    self.assertEqual(response['head']['status'], 403)
-    self.assertEqual(response.get('body'), None)
-
-    # cannot make a user a member of ROOT group
-    test_user['groups'] = ['users','sys_admin', 'ROOT']
-    response = self.putUser(test_user, passkey,
-        *response['head']['authorization'])
-
-    self.assertEqual(response['head']['status'], 403)
-    self.assertEqual(response.get('body'), None)
+    auth = response['head']['authorization']
+    groups = zip(self.groups, [True, True, True, False, False])
+    for g, will_pass in groups:
+      auth = self.updateGroup(
+          test_user, g, passkey, auth, 'test_sys_admin updates %s'% g, will_pass)
 
     # get it back
-    response = self.getUser(passkey, *response['head']['authorization'])
-    self.assertEqual(response['body'].get('groups'), ['users','account_admin','user_admin'])
+    response = self.getUser(passkey, *auth)
+    self.assertEqual(response['body'].get('groups'), ['users', 'user_admin'])
 
