@@ -71,7 +71,7 @@ def get_public_user(loggedin_username, level):
       return None # user does not exist yet
     if loggedin_username == username:
       return {'username': username, 'groups': user.groups}
-    if level >= GROUPS['user_admin']['level']:
+    if level >= GROUPS['account_admin']['level']:
       return {'username': username, 'groups': user.groups}
     return {'username': username}
 
@@ -85,12 +85,17 @@ def update_public_user(loggedin_username, level):
   def updatePublicUser(user):
     stored_user = store.getBaseUser(user['username'])
 
+    stored_user.level = 0
+    for g in stored_user.groups:
+      if stored_user.level < GROUPS[g]['level']:
+        stored_user.level = GROUPS[g]['level']
+
     groups = user['groups']
     if groups != stored_user.groups:
       # request to change groups
       # can the logged in user make this change?
       if loggedin_username != user['username'] and \
-          level < GROUPS['user_admin']['level']:
+          (level < stored_user.level or level < GROUPS['account_admin']['level']):
         return False
 
       # can the logged in user update these groups?

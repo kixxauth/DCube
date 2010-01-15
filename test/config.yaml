@@ -47,4 +47,7 @@ full:
     - test_getBaseUser
     - test_invalidGroup
     - test_baseUser
+    - test_databaseUser
+    - test_accountUser
+    - test_userAdmin
     - test_sys_admin

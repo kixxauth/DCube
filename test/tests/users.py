@@ -270,7 +270,7 @@ class PrivUsers_BaseUser(unittest.TestCase):
 
     if will_pass:
       self.assertEqual(response['head']['status'], 200,
-          '%s got:%d expected:403'% (msg, response['head']['status']))
+          '%s got:%d expected:200'% (msg, response['head']['status']))
       self.assertEqual(response['body']['groups'], ['users', group],
           ('%s got:%s expected:%s'%
             (msg, response['body']['groups'], ['users', group])))
@@ -329,6 +329,134 @@ class PrivUsers_BaseUser(unittest.TestCase):
     response = self.getUser(passkey, *auth)
     self.assertEqual(response['body'].get('groups'), ['users'])
 
+  def test_databaseUser(self):
+    """database user updates base test user"""
+    username = 'test_database_admin'
+    passkey = 'secret'
+
+    # authenticate by calling the root domain url
+    response = tests.makeRequest('/', 'get', [username])
+
+    # get the base user
+    response = self.getUser(passkey, *response['head']['authorization'])
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), None)
+
+    auth = response['head']['authorization']
+    for g in self.groups:
+      auth = self.updateGroup(
+          test_user, g, passkey, auth, 'test_database_admin updates %s'% g)
+
+    # get it back
+    response = self.getUser(passkey, *auth)
+    self.assertEqual(response['body'].get('groups'), None)
+
+  def test_accountUser(self):
+    """account admin user updates base test user"""
+    username = 'test_account_admin'
+    passkey = 'secret'
+
+    # authenticate by calling the root domain url
+    response = tests.makeRequest('/', 'get', [username])
+
+    # get the base user
+    response = self.getUser(passkey, *response['head']['authorization'])
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users'])
+
+    auth = response['head']['authorization']
+    groups = zip(self.groups, [True, False, False, False, False])
+    for g, will_pass in groups:
+      auth = self.updateGroup(
+          test_user, g, passkey, auth, 'test_account_admin updates %s'% g, will_pass)
+
+    # get it back
+    response = self.getUser(passkey, *auth)
+    self.assertEqual(response['body'].get('groups'), ['users', 'database'])
+
+    # get a lower level user
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_database_admin'),
+        method='get', creds=creds)
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users','database'])
+
+    # modify a lower level user
+    test_user['groups'] = ['users']
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_database_admin'),
+        method='put', creds=creds, body=test_user)
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(response['body'].get('groups'), ['users'])
+
+    # get an upper level user
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_user_admin'),
+        method='get', creds=creds)
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users','user_admin'])
+
+    # modify an upper level user
+    test_user['groups'] = ['users','database']
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_user_admin'),
+        method='put', creds=creds, body=test_user)
+    self.assertEqual(response['head']['status'], 403)
+    self.assertEqual(response['body'], None)
+
+  def test_userAdmin(self):
+    """user admin user updates base test user"""
+    username = 'test_user_admin'
+    passkey = 'secret'
+
+    # authenticate by calling the root domain url
+    response = tests.makeRequest('/', 'get', [username])
+
+    # get the base user
+    response = self.getUser(passkey, *response['head']['authorization'])
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users'])
+
+    auth = response['head']['authorization']
+    groups = zip(self.groups, [True, True, False, False, False])
+    for g, will_pass in groups:
+      auth = self.updateGroup(
+          test_user, g, passkey, auth, 'test_user_admin updates %s'% g, will_pass)
+
+    # get it back
+    response = self.getUser(passkey, *auth)
+    self.assertEqual(response['body'].get('groups'), ['users', 'account_admin'])
+
+    # get a lower level user
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_account_admin'),
+        method='get', creds=creds)
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users','account_admin'])
+
+    # modify a lower level user
+    test_user['groups'] = ['users']
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_account_admin'),
+        method='put', creds=creds, body=test_user)
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(response['body'].get('groups'), ['users'])
+
+    # get an upper level user
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_sys_admin'),
+        method='get', creds=creds)
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users','sys_admin'])
+
+    # modify an upper level user
+    test_user['groups'] = ['users','ROOT']
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_sys_admin'),
+        method='put', creds=creds, body=test_user)
+    self.assertEqual(response['head']['status'], 403)
+    self.assertEqual(response['body'], None)
+
   def test_sys_admin(self):
     """sys_admin updates base test_user"""
     username = 'test_sys_admin'
@@ -352,4 +480,19 @@ class PrivUsers_BaseUser(unittest.TestCase):
     # get it back
     response = self.getUser(passkey, *auth)
     self.assertEqual(response['body'].get('groups'), ['users', 'user_admin'])
+
+    # get a lower level user
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_user_admin'),
+        method='get', creds=creds)
+    test_user = response['body']
+    self.assertEqual(test_user.get('groups'), ['users','user_admin'])
+
+    # modify a lower level user
+    test_user['groups'] = ['users','account_admin']
+    creds = tests.createCredentials(passkey, *response['head']['authorization'])
+    response = tests.makeRequest(url=(URL_USERS + 'test_user_admin'),
+        method='put', creds=creds, body=test_user)
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(response['body'].get('groups'), ['users','account_admin'])
 
