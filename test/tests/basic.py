@@ -39,9 +39,14 @@ class SetupTestUsers(unittest.TestCase):
     """Check for proper access restrictions on /testsetup"""
     local = (tests.HOST is tests.LOCALHOST)
     cxn = tests.httpConnection()
-    cxn.request('GET', '/testsetup')
+    cxn.request('PUT', '/testsetup')
     response = cxn.getresponse()
     self.assertEqual(response.status, (local and 204 or 403))
+    response.read()
+    cxn.request('DELETE', '/testsetup')
+    response = cxn.getresponse()
+    self.assertEqual(response.status, (local and 204 or 403))
+    response.read()
     cxn.close()
 
 # todo: check other URLs for JSONRequest compatability

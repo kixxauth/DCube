@@ -75,7 +75,7 @@ def putBaseUser(*a, **k):
   if not k.get('nextnonce') is None:
     ent.nextnonce = k['nextnonce']
 
-  if not k.get('nextnonce') is None:
+  if not k.get('passkey') is None:
     ent.passkey = k['passkey']
 
   if not k.get('groups') is None:
@@ -86,4 +86,6 @@ def putBaseUser(*a, **k):
       'groups': ent.groups}, ent.nonce, ent.nextnonce)
 
 def deleteBaseUser(username):
-  BaseUser.get_by_key_name('username:%s' % username).delete()
+  user = BaseUser.get_by_key_name('username:%s' % username)
+  if not user is None:
+    user.delete()

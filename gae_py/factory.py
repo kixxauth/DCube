@@ -40,6 +40,7 @@ def update_chap_user_creds(username, level):
 
   return updateChapUserCreds
 
+# todo: this should check the username == 'ROOT'
 def get_user_groups(username, level):
   """Returns a function that will return the group membership list for the
   given username.

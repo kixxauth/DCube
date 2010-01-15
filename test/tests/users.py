@@ -227,10 +227,26 @@ class PrivUsers_BaseUser(unittest.TestCase):
       'sys_admin',
       'ROOT']
 
+  local = (tests.HOST is tests.LOCALHOST)
+
   def setUp(self):
+    cxn = tests.httpConnection()
+    cxn.request('PUT', '/testsetup')
+    response = cxn.getresponse()
+    self.assertEqual(response.status, (self.local and 204 or 403))
+    response.read()
+    cxn.close()
+
     self.nonce, self.nextnonce = createUser(tests.USERNAME)
 
   def tearDown(self):
+    cxn = tests.httpConnection()
+    cxn.request('DELETE', '/testsetup')
+    response = cxn.getresponse()
+    self.assertEqual(response.status, (self.local and 204 or 403))
+    response.read()
+    cxn.close()
+
     removeUser(tests.USERNAME, tests.PASSKEY)
 
   def makeUserRequest(self, *a, **k):
@@ -266,6 +282,19 @@ class PrivUsers_BaseUser(unittest.TestCase):
           '%s got:%s expected:None'% (msg, response.get('body')))
 
     return response['head']['authorization']
+
+  def test_getBaseUser(self):
+    username = 'test_sys_admin'
+    passkey = 'secret'
+
+    # authenticate by calling the root domain url
+    response = tests.makeRequest('/', 'get', [username])
+
+    # get the base user
+    response = self.getUser(passkey, *response['head']['authorization'])
+    self.assertEqual(response['head']['status'], 200)
+    self.assertEqual(response['body'],
+        {'username': tests.USERNAME, 'groups': ['users']})
 
   def test_invalidGroup(self):
     """try to update user with invalid group name"""

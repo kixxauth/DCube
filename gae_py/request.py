@@ -75,12 +75,12 @@ def users_put_handler(this, storeFactory, user_url):
 def users_get_handler(this, storeFactory, user_url):
   """Handles get operations on a /users/ url.
   """
-  if this.userExists:
-    this.body = storeFactory('get_public_user')(user_url)
-  else:
+  this.body = storeFactory('get_public_user')(user_url)
+  if this.body is None:
     this.status = 404
-    this.message = 'user "%s" not found' % this.username
-    this.authenticate = []
+    this.message = 'user "%s" not found' % user_url
+    if this.username == user_url:
+      this.authenticate = []
 
 def users_delete_handler(this, storeFactory, user_url):
   """Handles delete operations on a /users/ url.

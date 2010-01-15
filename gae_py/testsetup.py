@@ -8,8 +8,7 @@ users for remote automated testing.
 #######################################################################
 
 import os
-
-_DONE = False
+import logging
 
 def respond(status, body):
   print 'Status: %s'% status
@@ -21,22 +20,15 @@ def respond(status, body):
   print body 
 
 def main():
-  global _DONE
-
   # Check to see if we are on the local dev_appserver.
   # If not, we bail!
   if not os.environ['SERVER_SOFTWARE'].startswith('Development'):
     respond('403 Forbidden','')
     return
 
-  # Short circuit if we have already been setup
-  if _DONE:
-    respond('204 No Content','')
-    return
+  logging.critical('/testsetup has been accessed')
 
-  # This is the only handler script where we should ever see this import.
-  import store
-  import pychap
+  http_method = os.environ['REQUEST_METHOD']
 
   users = [
         ('test_sys_admin', 'sys_admin'),
@@ -45,20 +37,26 @@ def main():
         ('test_database_admin', 'database')
       ]
 
-  def putuser(user):
-    pass
+  # This is the only handler script where we should ever see this import.
+  import store
 
-  for username, group in users:
-    chap_user = pychap.authenticate(lambda x:x, username=username)
-    user = store.getBaseUser(username)
-    user.username = username
-    user.nonce = chap_user.nonce
-    user.nextnonce = chap_user.nextnonce
-    user.groups = ['users', group]
-    store.putBaseUser(**user.__dict__)
+  if http_method == 'PUT':
+    import pychap
+
+    for username, group in users:
+      chap_user = pychap.authenticate(lambda x:x, username=username)
+      store.putBaseUser(**{
+        'username':username,
+        'groups':['users', group],
+        'nonce':chap_user.nonce,
+        'nextnonce':chap_user.nextnonce})
+
+  if http_method == 'DELETE':
+    for username, group in users:
+      store.deleteBaseUser(username)
 
   respond('204 No Content','')
-  _DONE = True
+
 
 if __name__ == '__main__':
   main()
