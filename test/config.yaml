@@ -29,7 +29,6 @@ full:
     tests:
     - test_methodNotAllowed
     - test_noUserURL
-    - test_usernameNotMatch
 
   - name: ExistingUser
     tests:
@@ -43,6 +42,6 @@ full:
     - test_putUser
     - test_deleteUser
 
-  - name: PrivUsers
+  - name: PrivUsers_BaseUser
     tests:
-    - test_base
+    - test_sys_admin

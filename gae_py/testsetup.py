@@ -39,9 +39,9 @@ def main():
   import pychap
 
   users = [
-        ('test_sys_admin', 'sys-admin'),
-        ('test_user_admin', 'user-admin'),
-        ('test_account_admin', 'account-admin'),
+        ('test_sys_admin', 'sys_admin'),
+        ('test_user_admin', 'user_admin'),
+        ('test_account_admin', 'account_admin'),
         ('test_database_admin', 'database')
       ]
 

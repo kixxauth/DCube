@@ -68,11 +68,22 @@ def getBaseUser(username):
 def putBaseUser(*a, **k):
   ent = BaseUser.get_by_key_name('username:%s' % k['username']) or \
       BaseUser(key_name=('username:%s' % k['username']))
-  ent.nonce = k.get('nonce') or ent.nonce
-  ent.nextnonce = k.get('nextnonce') or ent.nextnonce
-  ent.passkey = k.get('passkey') or ent.passkey
-  ent.groups = k.get('groups') or ent.groups
+
+  if not k.get('nonce') is None:
+    ent.nonce = k['nonce']
+
+  if not k.get('nextnonce') is None:
+    ent.nextnonce = k['nextnonce']
+
+  if not k.get('nextnonce') is None:
+    ent.passkey = k['passkey']
+
+  if not k.get('groups') is None:
+    ent.groups = k['groups']
+
   ent.put()
+  return ({'username': k['username'],
+      'groups': ent.groups}, ent.nonce, ent.nextnonce)
 
 def deleteBaseUser(username):
   BaseUser.get_by_key_name('username:%s' % username).delete()

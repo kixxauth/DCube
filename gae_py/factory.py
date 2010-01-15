@@ -8,8 +8,11 @@ capability based on the given username and group membership list.
 """
 import store
 import pychap
+import groups
 
 import logging
+
+GROUPS = groups.map
 
 def get_chap_user_creds(username, level):
   """Returns a function that will return authentication attributes for the
@@ -34,6 +37,7 @@ def update_chap_user_creds(username, level):
     # make sure the user exists before we put the updates to disk
     if (u.nonce and u.nextnonce):
       store.putBaseUser(**user.__dict__)
+
   return updateChapUserCreds
 
 def get_user_groups(username, level):
@@ -48,29 +52,54 @@ def create_new_user(username, level):
   """Returns a function that allows its caller to create a new user entity in
   the datastore.
   """
+  # todo: A sanity check should be made here to be sure that this user does not
+  # already exist
   def createNewUser():
-    def put_new_user(u):
-      assert u.username == username, \
-          'factory:: Invalid username in update_chap_user_creds().'
-      store.putBaseUser(**u.__dict__)
-
-    user = pychap.authenticate(put_new_user, username)
-    return [user.nonce, user.nextnonce]
+    return store.putBaseUser(
+        **pychap.authenticate(lambda x:1, username).__dict__)
 
   return createNewUser
 
-def get_public_user(username, level):
+def get_public_user(loggedin_username, level):
   """Returns a function that will return the "public" attribes of the given
   user in the form of a dictionary.
   """
-  def getPublicUser():
+  def getPublicUser(username):
     user = store.getBaseUser(username)
     if user.nonce is None:
       return None # user does not exist yet
-    return {'username': username, 'groups': user.groups}
+    if loggedin_username == username:
+      return {'username': username, 'groups': user.groups}
+    if level >= GROUPS['user_admin']['level']:
+      return {'username': username, 'groups': user.groups}
+    return {'username': username}
+
   return getPublicUser
+
+def update_public_user(loggedin_username, level):
+  def updatePublicUser(user):
+    stored_user = store.getBaseUser(user['username'])
+
+    groups = user['groups']
+    if groups != stored_user.groups:
+      # request to change groups
+      # can the logged in user make this change?
+      if loggedin_username != user['username'] and \
+          level < GROUPS['user_admin']['level']:
+        return False
+
+      # can the logged in user update these groups?
+      for g in groups:
+        if not g in stored_user.groups and \
+            not level > GROUPS[g]['level']:
+              return False
+
+    return store.putBaseUser(username=user['username'], groups=groups)
+
+  return updatePublicUser
 
 def delete_user(username, level):
   def deleteUser():
     store.deleteBaseUser(username)
   return deleteUser
+

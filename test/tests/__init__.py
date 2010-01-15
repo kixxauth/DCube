@@ -95,10 +95,10 @@ def createCredentials(passkey, username, nonce, nextnonce):
       cnonce(juxt(passkey, nextnonce)),
       response(juxt(passkey, nonce))]
 
-def makeRequest(url='/', method='get', creds=[]):
+def makeRequest(url='/', method='get', creds=[], body=None):
   cxn = httpConnection()
   req = makeJSONRequest_for_httplib(
-        url=url, method=method, creds=creds)
+        url=url, method=method, creds=creds, body=body)
   cxn.request(*req)
   res = cxn.getresponse().read()
   rv = simplejson.loads(res)

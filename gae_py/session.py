@@ -302,6 +302,7 @@ class Session():
     pub = Pub()
     pub.username = self.username
     pub.url = self.path
+    pub.data = self.json_req['body']
     pub.userExists = self.user_exists
     pub.authenticate = [
         self.username, self.auth_user['nonce'], self.auth_user['nextnonce']]

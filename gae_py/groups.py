@@ -7,8 +7,18 @@ map = {
 
     'users': {'level': 0, 'interfaces': [
       'create_new_user',
+      'update_public_user',
       'get_public_user',
       'delete_user']},
+
+    'database': {'level': 60, 'interfaces': [
+      ]},
+
+    'account_admin': {'level': 70, 'interfaces': [
+      ]},
+
+    'user_admin': {'level': 80, 'interfaces': [
+      ]},
 
     'sys_admin': {'level': 90, 'interfaces': [
       ]},

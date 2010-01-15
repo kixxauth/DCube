@@ -30,31 +30,53 @@ def users_base_handler(this, storeFactory, user_url):
     this.message = 'access to url "/users/" is forbidden'
     return False
 
-  if user_url != this.username:
-    this.status = 400
-    this.message = 'username "%s" does not match url "%s"' % \
-        (this.username, this.url)
-    return False
-
   return True
 
 def users_put_handler(this, storeFactory, user_url):
   """Handles put operations on a /users/ url.
   """
   if not this.userExists:
-    nonce, nextnonce = storeFactory('create_new_user')()
+    # create a new user
+    user, nonce, nextnonce = storeFactory('create_new_user')()
     logging.info('Created new user "%s"', this.username)
     this.status = 201
     this.message = 'created new user "%s"' % this.username
     this.authenticate = [this.username, nonce, nextnonce]
+    this.body = user
+    return True
 
-  this.body = storeFactory('get_public_user')()
+  # check inputs
+  if not this.data:
+    this.status = 400
+    this.message = 'invalid user data'
+    return False
+
+  if this.data.get('username') is None:
+    this.status = 400
+    this.message = 'user data must include a username'
+    return False
+
+  if this.data.get('groups') is None:
+    this.status = 400
+    this.message = 'user data must include a groups list'
+    return False
+
+  # update an existing user
+  result = storeFactory('update_public_user')(this.data)
+  if not result:
+    this.status = 403
+    this.message = 'permission denied to update user "%s"' % this.username
+    return False
+
+  this.status = 200
+  this.message = 'updated user "%s"' % this.username
+  this.body, nonce, nextnonce = result
 
 def users_get_handler(this, storeFactory, user_url):
   """Handles get operations on a /users/ url.
   """
   if this.userExists:
-    this.body = storeFactory('get_public_user')()
+    this.body = storeFactory('get_public_user')(user_url)
   else:
     this.status = 404
     this.message = 'user "%s" not found' % this.username
