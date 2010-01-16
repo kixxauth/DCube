@@ -1,3 +1,8 @@
+#
+# list of test suite configs
+#
+
+# All tests should go into 'full', which is the default
 full:
 - module: basic
   classes:
@@ -54,3 +59,19 @@ full:
     - test_accountUser
     - test_userAdmin
     - test_sys_admin
+
+- module: databases
+  classes:
+
+  - name: CreateDatabase
+    tests:
+    - test_create_db
+
+# Just the database tests.
+databases:
+- module: databases
+  classes:
+
+  - name: CreateDatabase
+    tests:
+    - test_create_db
