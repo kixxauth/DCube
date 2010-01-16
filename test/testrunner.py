@@ -28,11 +28,16 @@ def main():
   else:
     raise Exception('no connection to %s or %s'% (localhost, remote_host))
 
+  suites_ = sys.argv[1:]
+  if len(suites_) is 0:
+    suites_ = ['full']
+
   print ''
   print 'running tests on %s' % tests.HOST
+  print 'running suites %s' % suites_
   print ''
 
-  suites.run_suites(['full'])
+  suites.run_suites(suites_)
 
 if __name__ == '__main__':
   main()
