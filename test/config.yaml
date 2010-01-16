@@ -35,6 +35,9 @@ full:
     - test_getUser
     - test_putUser
     - test_deleteUser
+    - test_nonExistingUser_get
+    - test_nonExistingUser_put
+    - test_nonExistingUser_delete
 
   - name: NoUser
     tests:

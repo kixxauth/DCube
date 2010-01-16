@@ -35,6 +35,12 @@ def users_base_handler(this, storeFactory, user_url):
 def users_put_handler(this, storeFactory, user_url):
   """Handles put operations on a /users/ url.
   """
+  # catch unwanted guests
+  if this.username != user_url and not this.authorized:
+    this.status = 401
+    this.message = 'authenticate'
+    return False
+
   if not this.userExists:
     # create a new user
     user, nonce, nextnonce = storeFactory('create_new_user')()
@@ -85,6 +91,19 @@ def users_get_handler(this, storeFactory, user_url):
 def users_delete_handler(this, storeFactory, user_url):
   """Handles delete operations on a /users/ url.
   """
+  # catch unwanted guests
+  if this.username != user_url:
+    this.status = 403
+    this.message = 'forbidden'
+    return False
+  
+  if not this.authorized:
+    this.status = 401
+    this.message = 'authenticate'
+    if not this.userExists:
+      this.authenticate = []
+    return False
+
   this.authenticate = []
   if this.userExists:
     storeFactory('delete_user')()

@@ -263,6 +263,16 @@ class Session():
 
     chap_user = gate.get_builder(
         username, ['ROOT'], 'get_chap_user_creds')()
+
+    # If there is no nonce or nextnonce, the user does not exist
+    if chap_user['nonce'] is None or chap_user['nextnonce'] is None:
+      if not self.allow_none_user:
+        self.log['warn'] = 'user does not exist'
+        self.http_res_body = self.createJSONResponse(status=401, message='authenticate',
+          creds=[])
+        self.sendResponse()
+        raise StopSession(self.log['warn'])
+
     chap_user['cnonce'] = None
     chap_user['response'] = None
     try:
@@ -284,6 +294,7 @@ class Session():
     self.user_exists = (auth_user.message != pychap.USER_NA)
     self.auth_user['nonce'] = auth_user.nonce
     self.auth_user['nextnonce'] = auth_user.nextnonce
+    self.auth_user['authorized'] = auth_user.authenticated
     if auth_user.authenticated or \
         (auth_user.message is pychap.USER_NA and self.allow_none_user):
           return self
@@ -300,6 +311,7 @@ class Session():
     # A Pub instance is meant implement the session api given to the request
     # handler functions.
     pub = Pub()
+    pub.authorized  = self.auth_user['authorized']
     pub.username = self.username
     pub.url = self.path
     pub.data = self.json_req['body']

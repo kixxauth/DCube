@@ -75,7 +75,8 @@ class UsersURL(unittest.TestCase):
           tests.defaultHeaders(content_length=False))
 
       json_response = simplejson.loads(response.read())
-      self.assertEqual(json_response['head']['status'], 403)
+      self.assertEqual(json_response['head']['status'], 403,
+          'method:%s expected:%d got:%d'% (m, 403, json_response['head']['status']))
       self.assertEqual(json_response['head']['message'],
                        'access to url "/users/" is forbidden')
       self.assertEqual(json_response.get('body'), None)
@@ -178,6 +179,48 @@ class ExistingUser(unittest.TestCase):
     self.assertEqual(json_response.get('body'),
         {'username': tests.USERNAME, 'groups': ['users']})
 
+  def test_nonExistingUser_get(self):
+    """An non-existing user tries to get a user."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='get', creds=['non_user'])
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response['head']['message'], 'ok')
+    self.assertEqual(json_response.get('body'), {'username': tests.USERNAME})
+
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='get', creds=['non_user','dsf3209','sdfoiwe0'])
+    self.assertEqual(json_response['head']['status'], 200)
+    self.assertEqual(json_response['head']['message'], 'ok')
+    self.assertEqual(json_response.get('body'), {'username': tests.USERNAME})
+
+  def test_nonExistingUser_put(self):
+    """An non-existing user tries to put a user."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='put', creds=['non_user'])
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
+    self.assertEqual(json_response.get('body'), None)
+
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='put', creds=['non_user','dsf3209','sdfoiwe0'])
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
+    self.assertEqual(json_response.get('body'), None)
+
+  def test_nonExistingUser_delete(self):
+    """An non-existing user tries to delete a user."""
+    json_response = tests.makeRequest(
+        url=(URL_USERS + tests.USERNAME), method='delete', creds=['non_user'])
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response['head']['message'], 'forbidden')
+    self.assertEqual(json_response.get('body'), None)
+
+    json_response = tests.makeRequest(url=(URL_USERS + tests.USERNAME),
+        method='delete', creds=['non_user','dsf3209','sdfoiwe0'])
+    self.assertEqual(json_response['head']['status'], 403)
+    self.assertEqual(json_response['head']['message'], 'forbidden')
+    self.assertEqual(json_response.get('body'), None)
+
 class NoUser(unittest.TestCase):
   def setUp(self):
     """Delete the test user to setUp the create user test."""
@@ -213,9 +256,8 @@ class NoUser(unittest.TestCase):
     json_response = tests.makeRequest(
         url=(URL_USERS + tests.USERNAME), method='delete', creds=[tests.USERNAME])
 
-    self.assertEqual(json_response['head']['status'], 200)
-    self.assertEqual(json_response['head']['message'],
-        'deleted user "%s"'% tests.USERNAME)
+    self.assertEqual(json_response['head']['status'], 401)
+    self.assertEqual(json_response['head']['message'], 'authenticate')
     self.assertEqual(json_response['head']['authorization'], [])
     self.assertEqual(json_response.get('body'), None)
 
@@ -231,7 +273,7 @@ class PrivUsers_BaseUser(unittest.TestCase):
 
   def setUp(self):
     cxn = tests.httpConnection()
-    cxn.request('PUT', '/testsetup')
+    cxn.request('PUT', '/testsetup', None, {'Content-Length':0})
     response = cxn.getresponse()
     self.assertEqual(response.status, (self.local and 204 or 403))
     response.read()
