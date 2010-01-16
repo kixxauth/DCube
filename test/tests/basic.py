@@ -39,7 +39,7 @@ class SetupTestUsers(unittest.TestCase):
     """Check for proper access restrictions on /testsetup"""
     local = (tests.HOST is tests.LOCALHOST)
     cxn = tests.httpConnection()
-    cxn.request('PUT', '/testsetup')
+    cxn.request('PUT', '/testsetup', None, {'Content-Length':0})
     response = cxn.getresponse()
     self.assertEqual(response.status, (local and 204 or 403))
     response.read()
