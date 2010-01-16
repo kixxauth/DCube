@@ -343,9 +343,10 @@ class PrivUsers_BaseUser(unittest.TestCase):
           {'username': tests.USERNAME, 'groups': ['users']})
     else:
       self.skip('getBaseUser')
-      self.assertEqual(response['head']['status'], 401)
-      self.assertEqual(response['head']['authorization'], [])
-
+      response = self.getUser(passkey, username, None, None)
+      self.assertEqual(response['body'],
+          {'username': tests.USERNAME})
+ 
   def test_invalidGroup(self):
     """try to update user with invalid group name"""
     response = self.getUser(
@@ -387,15 +388,16 @@ class PrivUsers_BaseUser(unittest.TestCase):
     # authenticate by calling the root domain url
     response = tests.makeRequest('/', 'get', [username])
 
-    if not self.local:
-      self.skip('test_databaseUser')
-      self.assertEqual(response['head']['status'], 401)
-      self.assertEqual(response['head']['authorization'], [])
+    # get the base user
+    if self.local:
+      response = self.getUser(passkey, *response['head']['authorization'])
+      test_user = response['body']
+    else:
+      self.skip('databaseUser')
+      response = self.getUser(passkey, username, None, None)
+      self.assertEqual(response['body'], {'username': tests.USERNAME})
       return
 
-    # get the base user
-    response = self.getUser(passkey, *response['head']['authorization'])
-    test_user = response['body']
     self.assertEqual(test_user.get('groups'), None)
 
     auth = response['head']['authorization']
@@ -415,15 +417,16 @@ class PrivUsers_BaseUser(unittest.TestCase):
     # authenticate by calling the root domain url
     response = tests.makeRequest('/', 'get', [username])
 
-    if not self.local:
-      self.skip('test_accountUser')
-      self.assertEqual(response['head']['status'], 401)
-      self.assertEqual(response['head']['authorization'], [])
+    # get the base user
+    if self.local:
+      response = self.getUser(passkey, *response['head']['authorization'])
+      test_user = response['body']
+    else:
+      self.skip('accountUser')
+      response = self.getUser(passkey, username, None, None)
+      self.assertEqual(response['body'], {'username': tests.USERNAME})
       return
 
-    # get the base user
-    response = self.getUser(passkey, *response['head']['authorization'])
-    test_user = response['body']
     self.assertEqual(test_user.get('groups'), ['users'])
 
     auth = response['head']['authorization']
@@ -474,15 +477,16 @@ class PrivUsers_BaseUser(unittest.TestCase):
     # authenticate by calling the root domain url
     response = tests.makeRequest('/', 'get', [username])
 
-    if not self.local:
-      self.skip('test_userAdmin')
-      self.assertEqual(response['head']['status'], 401)
-      self.assertEqual(response['head']['authorization'], [])
+    # get the base user
+    if self.local:
+      response = self.getUser(passkey, *response['head']['authorization'])
+      test_user = response['body']
+    else:
+      self.skip('userAdmin')
+      response = self.getUser(passkey, username, None, None)
+      self.assertEqual(response['body'], {'username': tests.USERNAME})
       return
 
-    # get the base user
-    response = self.getUser(passkey, *response['head']['authorization'])
-    test_user = response['body']
     self.assertEqual(test_user.get('groups'), ['users'])
 
     auth = response['head']['authorization']
@@ -533,17 +537,17 @@ class PrivUsers_BaseUser(unittest.TestCase):
     # authenticate by calling the root domain url
     response = tests.makeRequest('/', 'get', [username])
 
-    if not self.local:
-      self.skip('test_sys_admin')
-      self.assertEqual(response['head']['status'], 401)
-      self.assertEqual(response['head']['authorization'], [])
+    # get the base user
+    if self.local:
+      response = self.getUser(passkey, *response['head']['authorization'])
+      test_user = response['body']
+    else:
+      self.skip('sys_admin')
+      response = self.getUser(passkey, username, None, None)
+      self.assertEqual(response['body'], {'username': tests.USERNAME})
       return
 
-    # get the base user
-    response = self.getUser(passkey, *response['head']['authorization'])
-    test_user = response['body']
     self.assertEqual(test_user.get('groups'), ['users'])
-
 
     auth = response['head']['authorization']
     groups = zip(self.groups, [True, True, True, False, False])
