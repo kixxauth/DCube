@@ -51,6 +51,12 @@ def main():
         'nonce':chap_user.nonce,
         'nextnonce':chap_user.nextnonce})
 
+    store.putBaseUser(**{
+      'username': 'BASE_USER',
+      'groups':['users'],
+      'nonce':chap_user.nonce,
+      'nextnonce':chap_user.nextnonce})
+
   if http_method == 'DELETE':
     for username, group in users:
       store.deleteBaseUser(username)
