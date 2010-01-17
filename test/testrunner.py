@@ -1,9 +1,8 @@
 #! /usr/bin/env python
-import os
 import sys
+import os
 
 import suites
-import tests # todo: remove
 from tests import test_utils
 import httplib
 import yaml
@@ -23,35 +22,34 @@ def getconfigs(dir):
   return yaml.load(open(os.path.join(dir, 'app.yaml')))
 
 def main():
-  appconfigs = getconfigs(
-      os.path.join(
-        os.path.split(
-          os.path.split(os.path.abspath(__file__))[0])[0],
-        'gae_py'))
-
   localhost = 'localhost:8080'
-  remote_host = (str(appconfigs.get('version')) +'.latest.'+
-                 appconfigs.get('application') +'.appspot.com')
-
-  tests.set_LOCALHOST(localhost) # todo: remove
-  tests.set_USERNAME('test_user1') # todo: remove
-  tests.set_PASSKEY('test$key') # todo: remove
 
   if checkhost(localhost):
-    tests.set_HOST(localhost) # todo: remove
-    test_utils.setup(localhost)
-  elif checkhost(remote_host):
-    tests.set_HOST(remote_host) # todo: remove
-    test_utils.setup(remote_host)
+    host = localhost
+
   else:
-    raise Exception('no connection to %s or %s'% (localhost, remote_host))
+    appconfigs = getconfigs(
+        os.path.join(
+          os.path.split(
+            os.path.split(os.path.abspath(__file__))[0])[0],
+          'gae_py'))
+
+    remote_host = (str(appconfigs.get('version')) +'.latest.'+
+                   appconfigs.get('application') +'.appspot.com')
+
+    if checkhost(remote_host):
+      host = remote_host
+    else:
+      raise Exception('no connection to %s or %s'% (localhost, remote_host))
+
+  test_utils.setup(host, (host is localhost))
 
   suites_ = sys.argv[1:]
   if len(suites_) is 0:
     suites_ = ['full']
 
   print ''
-  print 'running tests on %s' % tests.HOST
+  print 'running tests on %s' % host 
   print 'running suites %s' % suites_
   print ''
 

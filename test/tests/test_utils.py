@@ -1,6 +1,7 @@
 import httplib
 
 HOST = None
+LOCAL = True
 
 class Prototype(object):
   pass
@@ -12,12 +13,14 @@ def make_http_request(method, url, body, headers):
   rv = Prototype()
   rv.status = response.status
   rv.message = response.reason
-  rv.headers = response.getheaders()
+  rv.headers = dict(response.getheaders())
   rv.body = response.read()
   cxn.close()
   return rv
 
-def setup(host):
+def setup(host, local):
   global HOST
+  global LOCAL
 
   HOST = host
+  LOCAL = local

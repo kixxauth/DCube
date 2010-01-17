@@ -19,8 +19,13 @@ specification.  The methods indicated by the url mapping list for the handlers
 are not HTTP methods, but methods that conform to the protocol of this DCube
 host.
 """
-import session
+import session # todo: remove
+
+import time
+import re
 import logging
+
+import toolkit
 
 def users_base_handler(this, storeFactory, user_url):
   """Base handler for all calls to a /users/ url.
@@ -149,7 +154,7 @@ def base_handler(this, storeFactory):
   """
   this.message = 'DCube: Distributed Discriptive Datastore JSONRequest server.'
 
-def main():
+def old_main():
   # see the docs for session.start() for more about the url map list.
   session.start([
 
@@ -167,6 +172,40 @@ def main():
       {'GET': ([base_handler], True)})
 
     ])
+
+handler_map = []
+
+def main():
+  req = toolkit.request()
+  log = {}
+
+  for rx, handler in handler_map:
+    if rx.match():
+      return
+
+  # From here on out we are handling a 404 Not Found
+  headers = {
+      'cache-control': 'public',
+      'last-modified': 'Fri, 1 Jan 2010 00:00:01 GMT',
+      'expires': toolkit.http_date(time.time() + (toolkit.WEEK_SECS * 8))}
+
+  body_str = ("The URL '%s' could not be found on the %s host."%
+      (req.path_info, req.host))
+
+  if 'text/plain' in req.accept:
+    body_format = '%s'
+    headers['content-type'] = 'text/plain'
+
+  elif 'text/html' in req.accept:
+    body_format = '<h1>Not Found</h1>\n<p>%s</p>'
+    headers['content-type'] = 'text/html'
+
+  else:
+    body_format = '"%s"'
+    headers['content-type'] = 'application/jsonrequest'
+
+  toolkit.send_response(log, 404, headers, body_format % body_str)
+
 
 if __name__ == '__main__':
   main()

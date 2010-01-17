@@ -13,6 +13,10 @@ api_version: 1
 # request handler directives
 handlers:
 
+# Print out a list of the environment variables in text/plain
+- url: /environs
+  script: environs.py
+
 # One ring to rule them all.
 - url: /.*
   script: request.py

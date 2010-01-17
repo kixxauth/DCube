@@ -94,5 +94,6 @@ protocol:
   
   - name: Basic
     tests:
+    - test_not_found
     - test_docs
     - test_root
