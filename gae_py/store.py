@@ -15,8 +15,28 @@ with the datastore, and the api of this module should not be directly accessed
 in any other way.
 """
 from google.appengine.ext import db
+from google.appengine.api import datastore
+from google.appengine.api import datastore_errors
 
 import logging
+
+class BaseDatabase(object):
+  kind = 'BaseDatabase'
+  prefix = 'db:%s'
+  def __init__(self, owner_acl):
+    self.owner_acl = property(owner_acl, "Lazy parsing of the owner access list.")
+
+def get_db(db_name):
+  try:
+    ents = datastore.Get(datastore.Key.from_path(
+      BaseDatabase.kind, BaseDatabase.prefix % db_name)) 
+  except datastore_errors.EntityNotFoundError:
+    return None
+
+  def get_owner_acl(self):
+    return 'ok'
+
+  return BaseDatabase(get_owner_acl)
 
 class BaseUserPrototype():
   def __init__(self):

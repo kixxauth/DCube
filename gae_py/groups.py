@@ -12,7 +12,8 @@ map = {
       'delete_user']},
 
     'database': {'level': 60, 'interfaces': [
-      ]},
+      'get_db',
+      'delete_db']},
 
     'account_admin': {'level': 70, 'interfaces': [
       ]},

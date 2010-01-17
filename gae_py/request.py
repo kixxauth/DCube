@@ -124,10 +124,25 @@ def db_put_handler(this, storeFactory, db_url):
   pass
 
 def db_get_handler(this, storeFactory, db_url):
-  pass
+  db = None
+  try:
+    db = storeFactory('get_db')(db_url)
+  except AssertionError, ae:
+    logging.error(ae)
+
+  if db is None:
+    this.status = 404
+    this.message = 'database "%s" not found'% db_url
+    return True
 
 def db_delete_handler(this, storeFactory, db_url):
-  pass
+  try:
+    storeFactory('delete_db')(db_url)
+  except AssertionError, ae:
+    logging.error(ae)
+  this.status = 204
+  this.message = 'deleted database "%s"'% db_url
+  return True
 
 def base_handler(this, storeFactory):
   """Base handler for all calls to '/' root domain url.

@@ -14,6 +14,31 @@ import logging
 
 GROUPS = groups.map
 
+def get_db(username, level):
+  def getdb(db_name):
+    db = store.get_db(db_name)
+    if db is None:
+      return None
+
+    # Check the access lists before we allow this user to access it.
+    if not username in db.owner_acl:
+      assert username in db.manager_acl, 'NOT MANAGER'
+
+  return getdb
+
+
+def delete_db(username, level):
+  def deletedb(db_name):
+    db = store.get_db(db_name)
+    if db is None:
+      return
+
+    # Check the db owner access list before we allow this user to delete it.
+    assert username in db.owner_acl, 'NOT OWNER'
+    store.remove_db(db_name)
+
+  return deletedb
+
 def get_chap_user_creds(username, level):
   """Returns a function that will return authentication attributes for the
   given user.
