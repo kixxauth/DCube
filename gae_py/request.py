@@ -110,6 +110,25 @@ def users_delete_handler(this, storeFactory, user_url):
     logging.info('Deleted user "%s"', this.username)
   this.message = 'deleted user "%s"' % this.username
 
+def db_base_handler(this, storeFactory, db_url):
+  """Base handler for all calls to a /databases/ url.
+  """
+  if len(db_url) is 0:
+    this.status = 403
+    this.message = 'access to url "/databases/" is forbidden'
+    return False
+
+  return True
+
+def db_put_handler(this, storeFactory, db_url):
+  pass
+
+def db_get_handler(this, storeFactory, db_url):
+  pass
+
+def db_delete_handler(this, storeFactory, db_url):
+  pass
+
 def base_handler(this, storeFactory):
   """Base handler for all calls to '/' root domain url.
   """
@@ -123,6 +142,11 @@ def main():
       {'PUT': ([users_base_handler, users_put_handler], True),
        'GET': ([users_base_handler, users_get_handler], True),
        'DELETE': ([users_base_handler, users_delete_handler], True)}),
+
+    ('/databases/(\w*)',
+      {'PUT': [db_base_handler, db_put_handler],
+       'GET': [db_base_handler, db_get_handler],
+       'DELETE': [db_base_handler, db_delete_handler]}),
 
     ('/',
       {'GET': ([base_handler], True)})

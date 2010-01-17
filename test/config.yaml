@@ -63,6 +63,11 @@ full:
 - module: databases
   classes:
 
+  - name: DatabasesURL
+    tests:
+    - test_method_not_allowed
+    - test_no_db_url
+
   - name: CreateDatabase
     tests:
     - test_create_db
@@ -71,6 +76,11 @@ full:
 databases:
 - module: databases
   classes:
+
+  - name: DatabasesURL
+    tests:
+    - test_method_not_allowed
+    - test_no_db_url
 
   - name: CreateDatabase
     tests:
