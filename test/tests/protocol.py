@@ -37,13 +37,11 @@ class Basic(unittest.TestCase):
 
     def trivial_checks(response):
       self.assertEqual(response.message, 'Not Found') 
-      self.assertEqual(response.headers['content-type'],
-                       'application/jsonrequest')
       self.assertEqual(response.headers['cache-control'],
                        'public')
       self.assertEqual(response.headers['last-modified'],
                        'Fri, 1 Jan 2010 00:00:01 GMT')
-      # We can't check the expires header directly because of time scews.
+      # We can't check the expires header directly because of time skew.
       self.assertEqual(len(response.headers['expires']), 29)
 
 
@@ -57,6 +55,39 @@ class Basic(unittest.TestCase):
 
     self.assertEqual(response.status, 404)
     self.assertEqual(response.body, '"%s"'% expected_response_body) 
+    self.assertEqual(response.headers['content-type'],
+                       'application/jsonrequest')
+
+    trivial_checks(response)
+
+    # text/plain
+    response = make_req({'Accept':'text/plain',
+              'User-Agent':'DCube not found tester :: no-accept',
+              'Host': HOST})
+
+    expected_response_body = ("The URL '/lost_city_of_atlantis' "
+        "could not be found on the %s host."% HOST)
+
+    self.assertEqual(response.status, 404)
+    self.assertEqual(response.body, '%s'% expected_response_body) 
+    self.assertEqual(response.headers['content-type'],
+                       'text/plain')
+
+    trivial_checks(response)
+
+    # text/html
+    response = make_req({'Accept':'text/html',
+              'User-Agent':'DCube not found tester :: no-accept',
+              'Host': HOST})
+
+    expected_response_body = ("The URL '/lost_city_of_atlantis' "
+        "could not be found on the %s host."% HOST)
+
+    self.assertEqual(response.status, 404)
+    self.assertEqual(response.body,
+        '<h1>Not Found</h1>\n<p>%s</p>'% expected_response_body) 
+    self.assertEqual(response.headers['content-type'],
+                       'text/html')
 
     trivial_checks(response)
 
