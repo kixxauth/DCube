@@ -60,6 +60,8 @@ class UsersURL(unittest.TestCase):
 
     cxn.close()
 
+  # todo: This test should work with non existing as well an unauthenticated
+  # users.
   def test_noUserURL(self):
     """/users/: username not included in url"""
     cxn = tests.httpConnection()
