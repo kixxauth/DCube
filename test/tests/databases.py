@@ -209,14 +209,66 @@ class CreateDatabase(unittest.TestCase):
     response.read()
     cxn.close()
 
+  def try_create_db(self, username, passkey, priv):
+    response = tests.makeRequest(url=(URL_DB + DB),
+                                 method='put',
+                                 creds=[username],
+                                 body=None)
+    self.assertEqual(response['head']['status'], 401)
+    self.assertEqual(response['body'], None)
+    if priv == 'none':
+      self.assertEqual(len(response['head']['authorization']), 0)
+      return
+
+    response = tests.makeRequest(url=(URL_DB + DB),
+                                 method='put',
+                                 creds=tests.createCredentials(
+                                   passkey,
+                                   *response['head']['authorization']),
+                                 body={'name':DB, 'whitelist':'*'})
+    if priv == 'ok':
+      self.assertEqual(response['head']['status'], 201)
+      self.assertEqual(response['body'], {'name':DB, 'whitelist':'*'})
+    if priv == 'unauth':
+      self.assertEqual(response['head']['status'], 401)
+      self.assertEqual(response['body'], None)
+    if priv == 'forbidden':
+      self.assertEqual(response['head']['status'], 403)
+      self.assertEqual(response['body'], None)
+    else:
+      assert False, 'NO TESTS'
+
+    response = tests.makeRequest(url=(URL_DB + DB),
+                                 method='get',
+                                 creds=tests.createCredentials(
+                                   passkey,
+                                   *response['head']['authorization']),
+                                 body=None)
+    if priv == 'ok':
+      self.assertEqual(response['head']['status'], 200)
+      self.assertEqual(response['body'], {'name':DB, 'whitelist':'*'})
+    if priv == 'unauth':
+      self.assertEqual(response['head']['status'], 401)
+      self.assertEqual(response['body'], None)
+    if priv == 'forbidden':
+      self.assertEqual(response['head']['status'], 403)
+      self.assertEqual(response['body'], None)
+    else:
+      assert False, 'NO TESTS'
+
   #
   # todo: test invalid database names
   #
   def test_create_db(self):
     users = [
-        (tests.USERNAME, 'sys_admin'),
-        ('test_sys_admin', 'sys_admin'),
-        ('test_user_admin', 'user_admin'),
-        ('test_account_admin', 'account_admin'),
-        ('test_database_admin', 'database')]
+        ('no_user', 'secret', 'none'),
+        (tests.USERNAME, 'incorrect', 'unauth'),
+        (tests.USERNAME, tests.PASSKEY, 'forbidden'),
+        ('test_sys_admin', tests.PASSKEY, 'forbidden'),
+        ('test_user_admin', tests.PASSKEY, 'forbidden'),
+        ('test_account_admin', tests.PASSKEY, 'forbidden'),
+        ('test_database_admin', tests.PASSKEY, 'ok')]
+
+    for u in users:
+      self.try_create_db(*u)
 
