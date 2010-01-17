@@ -4,7 +4,7 @@
 
 # The name and version of the application
 application: fireworks-skylight 
-version: 0-2
+version: 0-3
 
 # The App Engine runtime api specification
 runtime: python
@@ -13,21 +13,7 @@ api_version: 1
 # request handler directives
 handlers:
 
-  # Return the robots.txt file for crawler bots.
-- url: /robots.txt
-  script: robots.py
-
-  # Print out a list of environment variables set by App Engine and return as
-  # an http response.
-- url: /environs
-  script: environs.py
-
-  # Set up for user testing
-  # ON LOCAL dev_appserver ONLY !!! (security)
-- url: /testsetup
-  script: testsetup.py
-
-  # All other requests are sent to request.py
+# One ring to rule them all.
 - url: /.*
   script: request.py
 
