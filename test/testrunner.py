@@ -2,12 +2,28 @@
 import os
 import sys
 
-import tools
 import suites
-import tests
+import tests # todo: remove
+from tests import test_utils
+import httplib
+import yaml
+
+def checkhost(url):
+  cxn = httplib.HTTPConnection(url)
+  try:
+    cxn.request('GET', '/')
+    return True
+  except httplib.socket.error:
+    return False
+
+def getconfigs(dir):
+  """Takes the path to the root app directory and returns the current app
+  configs as parsed by PyYaml.
+  """
+  return yaml.load(open(os.path.join(dir, 'app.yaml')))
 
 def main():
-  appconfigs = tools.getconfigs(
+  appconfigs = getconfigs(
       os.path.join(
         os.path.split(
           os.path.split(os.path.abspath(__file__))[0])[0],
@@ -17,14 +33,16 @@ def main():
   remote_host = (str(appconfigs.get('version')) +'.latest.'+
                  appconfigs.get('application') +'.appspot.com')
 
-  tests.set_LOCALHOST(localhost)
-  tests.set_USERNAME('test_user1')
-  tests.set_PASSKEY('test$key')
+  tests.set_LOCALHOST(localhost) # todo: remove
+  tests.set_USERNAME('test_user1') # todo: remove
+  tests.set_PASSKEY('test$key') # todo: remove
 
-  if tools.checkhost(localhost):
-    tests.set_HOST(localhost) 
-  elif tools.checkhost(remote_host):
-    tests.set_HOST(remote_host) 
+  if checkhost(localhost):
+    tests.set_HOST(localhost) # todo: remove
+    test_utils.setup(localhost)
+  elif checkhost(remote_host):
+    tests.set_HOST(remote_host) # todo: remove
+    test_utils.setup(remote_host)
   else:
     raise Exception('no connection to %s or %s'% (localhost, remote_host))
 

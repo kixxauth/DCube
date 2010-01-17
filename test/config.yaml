@@ -85,3 +85,14 @@ databases:
   - name: CreateDatabase
     tests:
     - test_create_db
+
+# The full set of DCube protocol tests
+protocol:
+- module: protocol
+  
+  classes:
+  
+  - name: Basic
+    tests:
+    - test_docs
+    - test_root
