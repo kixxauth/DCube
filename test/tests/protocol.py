@@ -62,7 +62,7 @@ class Basic(unittest.TestCase):
 
     # text/plain
     response = make_req({'Accept':'text/plain',
-              'User-Agent':'DCube not found tester :: no-accept',
+              'User-Agent':'DCube not found tester :: text/plain',
               'Host': HOST})
 
     expected_response_body = ("The URL '/lost_city_of_atlantis' "
@@ -77,7 +77,7 @@ class Basic(unittest.TestCase):
 
     # text/html
     response = make_req({'Accept':'text/html',
-              'User-Agent':'DCube not found tester :: no-accept',
+              'User-Agent':'DCube not found tester :: text/html',
               'Host': HOST})
 
     expected_response_body = ("The URL '/lost_city_of_atlantis' "
@@ -135,3 +135,24 @@ class Basic(unittest.TestCase):
     """
     pass
 
+  def test_robots(self):
+    """## Test the robots.txt call. ##
+
+    DCube also implements a simple robots.txt file for the web crawling bots
+    that care to listen.
+
+    """
+    response =  test_utils.make_http_request('GET', '/robots.txt', None,
+        {'User-Agent':'DCube robots.text tester'})
+
+    self.assertEqual(response.status, 200)
+    self.assertEqual(response.headers['content-type'],
+                       'text/plain')
+    self.assertEqual(response.headers['content-length'], '25')
+    self.assertEqual(response.headers['cache-control'],
+                     'public')
+    self.assertEqual(response.headers['last-modified'],
+                     'Fri, 1 Jan 2010 00:00:01 GMT')
+    # We can't check the expires header directly because of time skew.
+    self.assertEqual(len(response.headers['expires']), 29)
+    self.assertEqual(response.body, 'User-agent: *\nDisallow: /') 

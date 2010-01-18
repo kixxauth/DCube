@@ -26,6 +26,7 @@ def request():
   env['wsgi.url_scheme'] = wsgiref.util.guess_scheme(env)
   env['wsgi.multithread'] = False
   env['wsgi.multiprocess'] = False
+  env['HTTP_USER_AGENT'] = env.get('HTTP_USER_AGENT') or 'user-agent'
 
   return webob.Request(env, charset='utf-8',
       unicode_errors='ignore', decode_param_names=True)
@@ -40,10 +41,11 @@ def send_response(log, status, headers, body):
     body: The body of the HTTP response.
 
   """
-  logging.info('REQUEST %s %d %s',
+  logging.info('REQUEST %s %d %s %s',
       (log.get('method') or 'na'),
       (log.get('status') or 0),
-      (log.get('warn') or 'ok'))
+      (log.get('warn') or 'ok'),
+      (log.get('user-agent') or 'user-agent'))
   util._start_response(
       ('%d %s' %
         (status, webapp.Response.http_status_message(status))),

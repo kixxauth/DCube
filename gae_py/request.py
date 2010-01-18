@@ -173,14 +173,52 @@ def old_main():
 
     ])
 
-handler_map = []
+class Response(object):
+  def __init__(self, attrs):
+    self.__dict__ = attrs
+
+class Session(object):
+  def __init__(self, req, log, matches):
+    self.req = req
+    self.log = log
+    self.url_matches = matches
+
+    headers ={
+        'content-type': 'application/jsonrequest',
+        'cache-control': 'private',
+        'last-modified': toolkit.http_date(time.time()),
+        'expires': toolkit.http_date(time.time() + 360)}
+
+    self.res = Response({
+      'status': 200,
+      'headers': headers,
+      'body': ''})
+
+  def toresponse(self):
+    return (self.log, self.res.status, self.res.headers, self.res.body)
+
+  toresponse = property(toresponse)
+
+def robots(session):
+  session.res.headers['content-type'] = 'text/plain'
+  session.res.headers['cache-control'] = 'public'
+  session.res.headers['last-modified'] = 'Fri, 1 Jan 2010 00:00:01 GMT'
+  session.res.headers['expires'] = toolkit.http_date(
+      time.time() + (toolkit.WEEK_SECS * 8))
+  session.res.body = 'User-agent: *\nDisallow: /'
+
+handler_map = [(re.compile('^/robots\.txt$'), robots)]
 
 def main():
   req = toolkit.request()
-  log = {}
+  log = {'user-agent': req.headers['User-Agent']}
 
   for rx, handler in handler_map:
-    if rx.match():
+    m = rx.match(req.path_info)
+    if m is not None:
+      s = Session(req, log, m.groups())
+      handler(s)
+      toolkit.send_response(*s.toresponse)
       return
 
   # From here on out we are handling a 404 Not Found
