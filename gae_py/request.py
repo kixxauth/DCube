@@ -26,6 +26,7 @@ import re
 import logging
 
 import toolkit
+from django.utils import simplejson
 
 def users_base_handler(this, storeFactory, user_url):
   """Base handler for all calls to a /users/ url.
@@ -201,19 +202,81 @@ class Session(object):
 
 def jsonrequest(f):
   def wrapper(session):
+    """Check and validate basic DCube and JSONRequest protocol."""
+
+    # We only supprt POST requests for the DCube protocol.
     if session.req.method != 'POST':
-      msg = ('Invalid JSONRequest HTTP method "%s".'% session.req.method)
-      session.log['warn'] = msg
+      session.log['warn'] = 'Invalid HTTP method %s'% session.req.method
       session.res.status = 405
       session.res.headers['content-type'] = 'text/plain'
-      session.res.body = msg
-      return None
+      session.res.body = ('HTTP method "%s" is invalid for DCube protocol.'%
+          session.req.method)
+      return
+
+    # We only support the application/jsonrequest media type.
+    if session.req.content_type != 'application/jsonrequest':
+      session.log['warn'] = ('Invalid request media type %s'%
+          session.req.content_type)
+      session.res.status = 415
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = ('Content-Type "%s" is invalid for JSONRequest protocol.'%
+          session.req.content_type)
+      return
+
+    # We are only capable of producing application/jsonrequest output.
+    if session.req.headers.get('accept') != 'application/jsonrequest':
+      session.log['warn'] = ('Invalid Accept header %s'%
+          session.req.headers.get('accept'))
+      session.res.status = 406
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = ('This DCube server is only capable of '
+        'producing media type "application/jsonrequest".')
+      return
+
+    # We only accept valid JSON text in the request body
+    json = None
+    try:
+      json = simplejson.loads(session.req.body)
+    except:
+      session.log['warn'] = 'invalid JSON'
+      session.res.status = 400
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = ('Invalid JSON text body : (%s)'% session.req.body)
+      return
+
+    # Only the {} dict object is acceptable as a message payload for the DCube
+    # protcol.
+    if not isinstance(json, dict):
+      session.log['warn'] = 'invalid JSON'
+      session.res.status = 400
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = ('Invalid JSON text body : (%s)'% session.req.body)
+      return
+
+    # Create the body object according to the DCube protocol.
+    if not isinstance(json.get('head'), dict):
+      session.log['warn'] = 'missing DCube head'
+      session.res.status = 400
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = ('Missing DCube message "head" in (%s)'%
+          session.req.body)
+      return
+
+    if not isinstance(json['head'].get('method'), basestring):
+      session.log['warn'] = 'missing DCube method'
+      session.res.status = 400
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = ('Missing DCube message header "method" in (%s)'%
+          session.req.body)
+      return
+
+    f(session) # Moving on now. Passing control back to the original function.
+
   return wrapper
 
 @jsonrequest
 def root_url(session):
-  if session is None:
-    return
+  pass
 
 def robots(session):
   session.res.headers['content-type'] = 'text/plain'
