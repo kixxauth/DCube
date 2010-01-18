@@ -199,6 +199,22 @@ class Session(object):
 
   toresponse = property(toresponse)
 
+def jsonrequest(f):
+  def wrapper(session):
+    if session.req.method != 'POST':
+      msg = ('Invalid JSONRequest HTTP method "%s".'% session.req.method)
+      session.log['warn'] = msg
+      session.res.status = 405
+      session.res.headers['content-type'] = 'text/plain'
+      session.res.body = msg
+      return None
+  return wrapper
+
+@jsonrequest
+def root_url(session):
+  if session is None:
+    return
+
 def robots(session):
   session.res.headers['content-type'] = 'text/plain'
   session.res.headers['cache-control'] = 'public'
@@ -207,7 +223,9 @@ def robots(session):
       time.time() + (toolkit.WEEK_SECS * 8))
   session.res.body = 'User-agent: *\nDisallow: /'
 
-handler_map = [(re.compile('^/robots\.txt$'), robots)]
+handler_map = [
+    (re.compile('^/$'), root_url),
+    (re.compile('^/robots\.txt$'), robots)]
 
 def main():
   req = toolkit.request()

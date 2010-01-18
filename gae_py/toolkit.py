@@ -41,11 +41,13 @@ def send_response(log, status, headers, body):
     body: The body of the HTTP response.
 
   """
+  headers['content-length'] = len(body)
   logging.info('REQUEST %s %d %s %s',
       (log.get('method') or 'na'),
       (log.get('status') or 0),
       (log.get('warn') or 'ok'),
       (log.get('user-agent') or 'user-agent'))
+
   util._start_response(
       ('%d %s' %
         (status, webapp.Response.http_status_message(status))),

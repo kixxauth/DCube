@@ -28,13 +28,6 @@ class Basic(unittest.TestCase):
     current host domain name respectively.
 
     """
-    def make_req(headers):
-      return test_utils.make_http_request(
-          method='GET',
-          url='/lost_city_of_atlantis',
-          body=None,
-          headers=headers)
-
     def trivial_checks(response):
       self.assertEqual(response.message, 'Not Found') 
       self.assertEqual(response.headers['cache-control'],
@@ -46,7 +39,11 @@ class Basic(unittest.TestCase):
 
 
     # The accept header is not specified
-    response = make_req({'Accept':None,
+    response = test_utils.make_http_request(
+        method='GET', # Try a HTTP GET request
+        url='/lost_city_of_atlantis',
+        body=None,
+        headers={'Accept':None,
               'User-Agent':'DCube not found tester :: no-accept',
               'Host': HOST})
 
@@ -61,8 +58,15 @@ class Basic(unittest.TestCase):
     trivial_checks(response)
 
     # text/plain
-    response = make_req({'Accept':'text/plain',
+    response = test_utils.make_http_request(
+        method='PUT', # Try a HTTP PUT request
+        url='/lost_city_of_atlantis',
+        body=None,
+        headers={'Accept':'text/plain',
               'User-Agent':'DCube not found tester :: text/plain',
+              'Content-Length': '0',
+              # Without the Content-Length header the server will respond with
+              # a 411 Length Required.
               'Host': HOST})
 
     expected_response_body = ("The URL '/lost_city_of_atlantis' "
@@ -76,8 +80,15 @@ class Basic(unittest.TestCase):
     trivial_checks(response)
 
     # text/html
-    response = make_req({'Accept':'text/html',
+    response = test_utils.make_http_request(
+        method='POST', # Try a HTTP POST request
+        url='/lost_city_of_atlantis',
+        body=None,
+        headers={'Accept':'text/html',
               'User-Agent':'DCube not found tester :: text/html',
+              'Content-Length': '0',
+              # Without the Content-Length header the server will respond with
+              # a 411 Length Required.
               'Host': HOST})
 
     expected_response_body = ("The URL '/lost_city_of_atlantis' "
@@ -118,7 +129,7 @@ class Basic(unittest.TestCase):
     "http://fireworks-skylight.appspot.com/" url of the DCube api demonstrate
     the trivial utility it provides.
       
-      * Like most urls in this protocol, "/" only implements the HTTP "GET"
+      * Like most urls in this protocol, "/" only implements the HTTP "POST"
       method.
 
       * Also, like most urls in this protocol, "/" adheres to the
@@ -133,7 +144,16 @@ class Basic(unittest.TestCase):
       it responds with the host information.
 
     """
-    pass
+    # Only allows POST requests
+    response = test_utils.make_http_request(
+        method='GET',
+        url='/',
+        body=None,
+        headers={'User-Agent': 'DCube / POST tester'})
+
+    self.assertEqual(response.status, 405)
+    self.assertEqual(response.message, 'Method Not Allowed')
+    self.assertEqual(response.body, 'Invalid JSONRequest HTTP method "GET".')
 
   def test_robots(self):
     """## Test the robots.txt call. ##
