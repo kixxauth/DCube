@@ -30,10 +30,10 @@ class Basic(unittest.TestCase):
     """
     def make_req(headers):
       return test_utils.make_http_request(
-          'GET',
-          '/lost_city_of_atlantis',
-          None,
-          headers)
+          method='GET',
+          url='/lost_city_of_atlantis',
+          body=None,
+          headers=headers)
 
     def trivial_checks(response):
       self.assertEqual(response.message, 'Not Found') 
@@ -104,10 +104,10 @@ class Basic(unittest.TestCase):
     # Make an HTTP 'GET' request on
     # "http://fireworks-skylight.appspot.com/docs/".
     response = test_utils.make_http_request(
-        'GET',
-        '/docs/',
-        None,
-        {'User-Agent':'DCube get docs tester'})
+        method='GET',
+        url='/docs/',
+        body=None,
+        headers={'User-Agent':'DCube get docs tester'})
 
     self.assertEqual(response.status, 404)
 
@@ -142,8 +142,11 @@ class Basic(unittest.TestCase):
     that care to listen.
 
     """
-    response =  test_utils.make_http_request('GET', '/robots.txt', None,
-        {'User-Agent':'DCube robots.text tester'})
+    response =  test_utils.make_http_request(
+        method='GET',
+        url='/robots.txt',
+        body=None,
+        headers={'User-Agent':'DCube robots.text tester'})
 
     self.assertEqual(response.status, 200)
     self.assertEqual(response.headers['content-type'],

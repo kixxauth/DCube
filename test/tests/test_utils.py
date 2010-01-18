@@ -6,7 +6,7 @@ LOCAL = True
 class Prototype(object):
   pass
 
-def make_http_request(method, url, body, headers):
+def make_http_request(method='POST', url='/', body=None, headers={}):
   cxn = httplib.HTTPConnection(HOST)
   cxn.request(method, url, body, headers)
   response = cxn.getresponse()
