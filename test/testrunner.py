@@ -24,23 +24,31 @@ def getconfigs(dir):
 def main():
   localhost = 'localhost:8080'
 
+  appconfigs = getconfigs(
+      os.path.join(
+        os.path.split(
+          os.path.split(os.path.abspath(__file__))[0])[0],
+        'gae_py'))
+
+  remote_host = (str(appconfigs.get('version')) +'.latest.'+
+                 appconfigs.get('application') +'.appspot.com')
+
   if checkhost(localhost):
     host = localhost
+    cxn = httplib.HTTPConnection(localhost)
+    cxn.request('PUT', '/testsetup', None, {'Content-Length':0})
+    response = cxn.getresponse()
+    assert response.status == 200, \
+        'Test user was not setup (status: %d)'% response.status
+    temp_test_admin = response.read()
+    assert isinstance(temp_test_admin, basestring), \
+        'Temp username is not a string ().'% temp_test_admin
+
+  elif checkhost(remote_host):
+    host = remote_host
 
   else:
-    appconfigs = getconfigs(
-        os.path.join(
-          os.path.split(
-            os.path.split(os.path.abspath(__file__))[0])[0],
-          'gae_py'))
-
-    remote_host = (str(appconfigs.get('version')) +'.latest.'+
-                   appconfigs.get('application') +'.appspot.com')
-
-    if checkhost(remote_host):
-      host = remote_host
-    else:
-      raise Exception('no connection to %s or %s'% (localhost, remote_host))
+    raise Exception('no connection to %s or %s'% (localhost, remote_host))
 
   test_utils.setup(host, (host is localhost))
 
@@ -49,8 +57,9 @@ def main():
     suites_ = ['full']
 
   print ''
-  print 'running tests on %s' % host 
-  print 'running suites %s' % suites_
+  print 'Running tests on: %s' % host 
+  print 'Running suites: %s' % suites_
+  print 'Using admin: %s'% temp_test_admin
   print ''
 
   suites.run_suites(suites_)

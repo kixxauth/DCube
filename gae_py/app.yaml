@@ -17,6 +17,10 @@ handlers:
 - url: /environs
   script: environs.py
 
+# Insecure, local only, to setup a tempory sys admin for testing.
+- url: /testsetup
+  script: testsetup.py
+
 # One ring to rule them all.
 - url: /.*
   script: request.py

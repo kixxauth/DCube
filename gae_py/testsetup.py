@@ -1,6 +1,5 @@
-"""Set up the sys-admin, user-admin, account-admin, and database level test
-users for remote automated testing.
-"""
+"""Set up the sys-admin test user for local automated testing."""
+
 #######################################################################
 #
 #   Do not fuck with with this handler! (it is a big security issue)  #
@@ -20,6 +19,14 @@ def respond(status, body):
   print body 
 
 def main():
+  TEMP_TEST_USERNAME = 'TEMP_INSECURE_USER'
+
+  http_method = os.environ['REQUEST_METHOD']
+
+  if http_method == 'GET':
+    respond('200 OK', TEMP_TEST_USERNAME)
+    return
+
   # Check to see if we are on the local dev_appserver.
   # If not, we bail!
   if not os.environ['SERVER_SOFTWARE'].startswith('Development'):
@@ -28,34 +35,26 @@ def main():
 
   logging.critical('/testsetup has been accessed')
 
-  http_method = os.environ['REQUEST_METHOD']
-
-  users = [
-        ('test_sys_admin', 'sys_admin'),
-        ('test_user_admin', 'user_admin'),
-        ('test_account_admin', 'account_admin'),
-        ('test_database_admin', 'database')
-      ]
-
   # This is the only handler script where we should ever see this import.
   import store
 
   if http_method == 'PUT':
-    import pychap
+    user = store.get_baseuser(TEMP_TEST_USERNAME)
+    if user is None:
+      user = type('Proto', (),
+          {'username': TEMP_TEST_USERNAME,
+           'groups': ['users', 'sys_admin']})()
+      import pychap
+      pychap.authenticate(store.put_baseuser, user)
 
-    for username, group in users:
-      chap_user = pychap.authenticate(lambda x:x, username=username)
-      store.putBaseUser(**{
-        'username':username,
-        'groups':['users', group],
-        'nonce':chap_user.nonce,
-        'nextnonce':chap_user.nextnonce})
+    respond('200 OK', TEMP_TEST_USERNAME)
 
-  if http_method == 'DELETE':
-    for username, group in users:
-      store.deleteBaseUser(username)
+  elif http_method == 'DELETE':
+    store.delete_baseuser(TEMP_TEST_USERNAME)
+    respond('204 No Content')
 
-  respond('204 No Content','')
+  else:
+    respond('405 Method Not Allowed','')
 
 
 if __name__ == '__main__':
