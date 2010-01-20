@@ -344,6 +344,7 @@ def root_url(session):
       message='OK', creds=creds, body=body)
 
 def robots(session):
+  # todo: We should not allow POST or PUT requests to robots.txt
   session.res.headers['content-type'] = 'text/plain'
   session.res.headers['cache-control'] = 'public'
   session.res.headers['last-modified'] = 'Fri, 1 Jan 2010 00:00:01 GMT'
@@ -358,6 +359,9 @@ handler_map = [
 def main():
   req = toolkit.request()
   log = {'user-agent': req.headers['User-Agent']}
+
+  logging.debug('webob content-type: %s', req.content_type)
+  logging.debug('content-type header: %s', req.headers.get('content_type'))
 
   for rx, handler in handler_map:
     m = rx.match(req.path_info)
