@@ -23,6 +23,7 @@ def getconfigs(dir):
 
 def main():
   localhost = 'localhost:8080'
+  passkey = 'secret$key'
 
   appconfigs = getconfigs(
       os.path.join(
@@ -50,7 +51,7 @@ def main():
   else:
     raise Exception('no connection to %s or %s'% (localhost, remote_host))
 
-  test_utils.setup(host, (host is localhost))
+  test_utils.setup(host, (host is localhost), temp_test_admin, passkey)
 
   suites_ = sys.argv[1:]
   if len(suites_) is 0:
@@ -63,6 +64,13 @@ def main():
   print ''
 
   suites.run_suites(suites_)
+
+  # If you remove this bit of functionality, I will shoot you.
+  cxn = httplib.HTTPConnection(localhost)
+  cxn.request('DELETE', '/testsetup')
+  response = cxn.getresponse()
+  assert response.status == 204, \
+      'TEST USER WAS NOT DELETED (http status:%d)'% response.status
 
 if __name__ == '__main__':
   main()

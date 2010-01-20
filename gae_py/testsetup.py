@@ -41,7 +41,7 @@ def main():
   if http_method == 'PUT':
     user = store.get_baseuser(TEMP_TEST_USERNAME)
     if user is None:
-      user = type('Proto', (),
+      user = type('Proto', (object,),
           {'username': TEMP_TEST_USERNAME,
            'groups': ['users', 'sys_admin']})()
       import pychap
@@ -51,7 +51,7 @@ def main():
 
   elif http_method == 'DELETE':
     store.delete_baseuser(TEMP_TEST_USERNAME)
-    respond('204 No Content')
+    respond('204 No Content', '')
 
   else:
     respond('405 Method Not Allowed','')
