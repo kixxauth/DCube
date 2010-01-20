@@ -99,3 +99,7 @@ protocol:
     - test_docs
     - test_root
     - test_authenticate
+
+  - name: UserManagement
+    tests:
+    - test_check_user

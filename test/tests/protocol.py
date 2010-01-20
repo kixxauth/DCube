@@ -405,11 +405,22 @@ class Basic(unittest.TestCase):
 class UserManagement(unittest.TestCase):
 
   def test_check_user(self):
+    #
     response = test_utils.make_http_request(
         method='GET',
-        url='/users/',
+        url='/users/foo_user',
         body=None,
-        headers={'User-Agent': 'UA:DCube test :: method not allowed'})
+        headers={'User-Agent': 'UA:DCube test :: GET method not allowed'})
     self.assertEqual(response.status, 405)
     self.assertEqual(response.message, 'Method Not Allowed')
     self.assertEqual(response.body, 'HTTP method "GET" is invalid for DCube protocol.')
+
+    #
+    response = test_utils.make_http_request(
+        method='PUT',
+        url='/users/foo_user',
+        body=None,
+        headers={'User-Agent': 'UA:DCube test :: PUT method not allowed'})
+    self.assertEqual(response.status, 405)
+    self.assertEqual(response.message, 'Method Not Allowed')
+    self.assertEqual(response.body, 'HTTP method "PUT" is invalid for DCube protocol.')

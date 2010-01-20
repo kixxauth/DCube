@@ -382,6 +382,10 @@ def root_url(session):
   session.res.body = toolkit.create_json_response(status=200,
       message='OK', creds=creds, body=body)
 
+@jsonrequest
+def users_url(session):
+  pass
+
 def robots(session):
   # todo: We should not allow POST or PUT requests to robots.txt
   session.res.headers['content-type'] = 'text/plain'
@@ -393,6 +397,7 @@ def robots(session):
 
 handler_map = [
     (re.compile('^/$'), root_url),
+    (re.compile('^/users/(.*)$'), users_url),
     (re.compile('^/robots\.txt$'), robots)]
 
 def main():
