@@ -186,8 +186,10 @@ class Session(object):
     self.log = log
     self.url_matches = matches
 
+    # todo: headers should be an object that implements a __set__ method that
+    # makes content-type, Content-Type, and CONTENT-TYPE all equivalent.
     headers ={
-        'content-type': 'application/jsonrequest',
+        'content-type': 'text/plain',
         'cache-control': 'private',
         'last-modified': toolkit.http_date(time.time()),
         'expires': toolkit.http_date(time.time() + 360)}
@@ -201,80 +203,115 @@ class Session(object):
   def toresponse(self):
     return (self.log, self.res.status, self.res.headers, self.res.body)
 
+  def prep_http(self,
+      warn='ok',
+      status=200,
+      headers={},
+      body=None):
+    """Update the Session object for HTTP output.
+
+    Args:
+      warn: The warning message that will go to the request log.
+      status: The HTTP status code for the response.
+      headers: A dictionary of HTTP headers to add or update in the response.
+      body: The content of the HTTP response body.
+
+    """
+    self.log['warn'] = warn
+    self.res.status = status
+    self.res.headers.update(headers)
+    self.res.body = body
+
+  def prep_json(self, warn='ok', status=200, message='OK', creds=[], body=None):
+    """Update the Sesssion object for outputing a DCube JSON message.
+
+    Args:
+      warn: The warning message that will go to the request log.
+      status: The DCube message status (not HTTP status)
+      message: The DCube status message
+      creds: The DCube message authentication credentials.
+      body: The DCube message body.
+
+    """
+
+    self.log['status'] = status # This is the protocol status, not the http status
+    self.prep_http(warn, 200,
+        {'content-type':'application/jsonrequest'},
+        toolkit.create_json_response(
+          status=status, message=message, creds=creds, body=body))
+
 def jsonrequest(f):
   def wrapper(session):
     """Check and validate basic DCube and JSONRequest protocol."""
 
     # We only supprt POST requests for the DCube protocol.
     if session.req.method != 'POST':
-      session.log['warn'] = 'Invalid HTTP method %s'% session.req.method
-      session.res.status = 405
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('HTTP method "%s" is invalid for DCube protocol.'%
-          session.req.method)
+      session.prep_http(
+        warn='Invalid HTTP method %s'% session.req.method,
+        status=405,
+        body=('HTTP method "%s" is invalid for DCube protocol.'%
+            session.req.method))
       return
 
     # We only support the application/jsonrequest media type.
     if session.req.content_type != 'application/jsonrequest':
-      session.log['warn'] = ('Invalid request media type %s'%
-          session.req.content_type)
-      session.res.status = 415
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('Content-Type "%s" is invalid for JSONRequest protocol.'%
-          session.req.content_type)
+      session.prep_http(
+        warn=('Invalid request media type %s'%
+          session.req.content_type),
+        status=415,
+        body=('Content-Type "%s" is invalid for JSONRequest protocol.'%
+          session.req.content_type))
       return
 
     # We are only capable of producing application/jsonrequest output.
     if session.req.headers.get('accept') != 'application/jsonrequest':
-      session.log['warn'] = ('Invalid Accept header %s'%
-          session.req.headers.get('accept'))
-      session.res.status = 406
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('This DCube server is only capable of '
-        'producing media type "application/jsonrequest".')
+      session.prep_http(
+        warn=('Invalid Accept header %s'%
+          session.req.headers.get('accept')),
+        status=406,
+        body=('This DCube server is only capable of '
+        'producing media type "application/jsonrequest".'))
       return
 
     # We only accept valid JSON text in the request body
     json = None
     try:
       json = simplejson.loads(session.req.body)
-    except:
-      session.log['warn'] = 'invalid JSON'
-      session.res.status = 400
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('Invalid JSON text body : (%s)'% session.req.body)
+    except: # todo: What error do we want to catch?
+      session.prep_http(
+        warn='invalid JSON',
+        status=400,
+        body=('Invalid JSON text body : (%s)'% session.req.body))
       return
 
     # Only the {} dict object is acceptable as a message payload for the DCube
     # protcol.
     if not isinstance(json, dict):
-      session.log['warn'] = 'invalid JSON'
-      session.res.status = 400
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('Invalid JSON text body : (%s)'% session.req.body)
+      session.prep_http(
+        warn='invalid JSON',
+        status=400,
+        body=('Invalid JSON text body : (%s)'% session.req.body))
       return
 
     # Create the body object according to the DCube protocol.
     if not isinstance(json.get('head'), dict):
-      session.log['warn'] = 'missing DCube head'
-      session.res.status = 400
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('Missing DCube message "head" in (%s)'%
-          session.req.body)
+      session.prep_http(
+        warn='missing DCube head',
+        status=400,
+        body=('Missing DCube message "head" in (%s)'%
+          session.req.body))
       return
 
     if not isinstance(json['head'].get('method'), basestring):
-      session.log['warn'] = 'missing DCube method'
-      session.res.status = 400
-      session.res.headers['content-type'] = 'text/plain'
-      session.res.body = ('Missing DCube message header "method" in (%s)'%
-          session.req.body)
+      session.prep_http(
+        warn='missing DCube method',
+        status=400,
+        body=('Missing DCube message header "method" in (%s)'%
+          session.req.body))
       return
 
     session.log['method'] = json['head']['method']
     session.jsonrequest = json
-    session.res.status = 200
-    session.res.headers['content-type'] = 'application/jsonrequest'
     f(session) # Moving on now. Passing control back to the original function.
 
   return wrapper
@@ -284,9 +321,9 @@ def dcube_authenticate(session):
 
   len_auth = len(auth)
   if not isinstance(auth, list) or len_auth is 0:
-    session.log['warn'] = 'no creds'
-    session.log['status'] = 401
-    session.res.body = toolkit.create_json_response(status=401,
+    session.prep_json(
+        warn='no creds',
+        status=401,
         message='No authorization credentials.')
     return
 
@@ -296,9 +333,9 @@ def dcube_authenticate(session):
       username = 'null'
     else:
       username = str(username)
-    session.log['warn'] = 'invalid username'
-    session.log['status'] = 401
-    session.res.body = toolkit.create_json_response(status=401,
+    session.prep_json(
+        warn='invalid username',
+        status=401,
         message='Username "%s" is invalid.'% username)
     return
 
@@ -306,9 +343,9 @@ def dcube_authenticate(session):
       'ROOT', ['ROOT'], 'get_chap_user_creds')(username)
   
   if chap_user is None:
-    session.log['warn'] = 'auth user does not exist'
-    session.log['status'] = 401
-    session.res.body = toolkit.create_json_response(status=401,
+    session.prep_json(
+        warn='auth user does not exist',
+        status=401,
         message='Username "%s" does not exist.'% username)
     return
 
@@ -324,9 +361,11 @@ def dcube_authenticate(session):
   #logging.warn('auth_status:"%s"', auth_user.message)
 
   if not auth_user.authenticated:
-    session.log['status'] = 401
-    session.res.body = toolkit.create_json_response(status=401,
-        message='Authenticate.', creds=[username, auth_user.nonce, auth_user.nextnonce])
+    session.prep_json(
+        warn='auth user does not exist',
+        status=401,
+        creds=[username, auth_user.nonce, auth_user.nextnonce],
+        message='Authenticate.')
     return
 
   session.log['status'] = 200

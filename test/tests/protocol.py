@@ -9,6 +9,14 @@ ADMIN_USERNAME = test_utils.ADMIN_USERNAME
 PASSKEY = test_utils.ADMIN_PASSKEY
 
 class Basic(unittest.TestCase):
+  """Define tests to examine basic functionality of this DCube host.
+  
+  These tests dive into the default "Not Found" response, the hosted doc pages,
+  the JSONRequest protocol and the DCube message format on the root URL, CHAP
+  authentication, and the robots.txt file.
+
+  """
+
   def test_not_found(self):
     """## Requesting a URL that does not exist. ##
 
@@ -393,3 +401,15 @@ class Basic(unittest.TestCase):
     # We can't check the expires header directly because of time skew.
     self.assertEqual(len(response.headers['expires']), 29)
     self.assertEqual(response.body, 'User-agent: *\nDisallow: /') 
+
+class UserManagement(unittest.TestCase):
+
+  def test_check_user(self):
+    response = test_utils.make_http_request(
+        method='GET',
+        url='/users/',
+        body=None,
+        headers={'User-Agent': 'UA:DCube test :: method not allowed'})
+    self.assertEqual(response.status, 405)
+    self.assertEqual(response.message, 'Method Not Allowed')
+    self.assertEqual(response.body, 'HTTP method "GET" is invalid for DCube protocol.')
