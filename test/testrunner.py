@@ -41,7 +41,7 @@ def main():
     response = cxn.getresponse()
     assert response.status == 200, \
         'Test user was not setup (status: %d)'% response.status
-    temp_test_admin = response.read()
+    temp_test_admin = response.read().rstrip()
     assert isinstance(temp_test_admin, basestring), \
         'Temp username is not a string ().'% temp_test_admin
 

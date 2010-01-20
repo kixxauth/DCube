@@ -43,25 +43,29 @@ def get_chap_user_creds(username, level):
   """Returns a function that will return authentication attributes for the
   given user.
   """
-  def getChapUserCreds():
-    user = store.getBaseUser(username)
-    return dict(username=username,
-            nonce=user.nonce,
-            nextnonce=user.nextnonce,
-            passkey=user.passkey)
+  assert username == 'ROOT', \
+      'factory:: Only "ROOT" user may access update_chap_user_creds().'
+  def getChapUserCreds(un):
+    user = store.get_baseuser(un)
+    if user is None:
+      return None
+
+    return type('Proto', (object,), {
+      'username': un,
+      'nonce': user.nonce,
+      'nextnonce': user.nextnonce,
+      'passkey': user.passkey})
+
   return getChapUserCreds
 
 def update_chap_user_creds(username, level):
   """Returns a function that will allow its caller to update authentication
   attributes for a user in the datastore.
   """
+  assert username == 'ROOT', \
+      'factory:: Only "ROOT" user may access update_chap_user_creds().'
   def updateChapUserCreds(user):
-    assert user.username == username, \
-        'factory:: Invalid username in update_chap_user_creds().'
-    u = store.getBaseUser(username)
-    # make sure the user exists before we put the updates to disk
-    if (u.nonce and u.nextnonce):
-      store.putBaseUser(**user.__dict__)
+    store.put_baseuser(user)
 
   return updateChapUserCreds
 

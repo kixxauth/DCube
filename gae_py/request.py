@@ -26,6 +26,8 @@ import re
 import logging
 
 import toolkit
+import gate
+import pychap
 from django.utils import simplejson
 
 def users_base_handler(this, storeFactory, user_url):
@@ -195,10 +197,9 @@ class Session(object):
       'headers': headers,
       'body': ''})
 
+  @property
   def toresponse(self):
     return (self.log, self.res.status, self.res.headers, self.res.body)
-
-  toresponse = property(toresponse)
 
 def jsonrequest(f):
   def wrapper(session):
@@ -270,13 +271,77 @@ def jsonrequest(f):
           session.req.body)
       return
 
+    session.log['method'] = json['head']['method']
+    session.jsonrequest = json
+    session.res.status = 200
+    session.res.headers['content-type'] = 'application/jsonrequest'
     f(session) # Moving on now. Passing control back to the original function.
 
   return wrapper
 
+def dcube_authenticate(session):
+  auth = session.jsonrequest['head'].get('authorization') or []
+
+  len_auth = len(auth)
+  if not isinstance(auth, list) or len_auth is 0:
+    session.log['warn'] = 'no creds'
+    session.log['status'] = 401
+    session.res.body = toolkit.create_json_response(status=401,
+        message='No authorization credentials.')
+    return
+
+  username = auth[0]
+  if not isinstance(username, basestring):
+    if username is None:
+      username = 'null'
+    else:
+      username = str(username)
+    session.log['warn'] = 'invalid username'
+    session.log['status'] = 401
+    session.res.body = toolkit.create_json_response(status=401,
+        message='Username "%s" is invalid.'% username)
+    return
+
+  chap_user = gate.get_builder(
+      'ROOT', ['ROOT'], 'get_chap_user_creds')(username)
+  
+  if chap_user is None:
+    session.log['warn'] = 'auth user does not exist'
+    session.log['status'] = 401
+    session.res.body = toolkit.create_json_response(status=401,
+        message='Username "%s" does not exist.'% username)
+    return
+
+  if len_auth != 3:
+    chap_user.cnonce = None
+    chap_user.response = None
+  else:
+    chap_user.cnonce = auth[1]
+    chap_user.response = auth[2]
+
+  auth_user = pychap.authenticate(gate.get_builder(
+      'ROOT', ['ROOT'], 'update_chap_user_creds'), chap_user)
+  #logging.warn('auth_status:"%s"', auth_user.message)
+
+  if not auth_user.authenticated:
+    session.log['status'] = 401
+    session.res.body = toolkit.create_json_response(status=401,
+        message='Authenticate.', creds=[username, auth_user.nonce, auth_user.nextnonce])
+    return
+
+  session.log['status'] = 200
+  return [username, auth_user.nonce, auth_user.nextnonce]
+
 @jsonrequest
 def root_url(session):
-  pass
+  creds = dcube_authenticate(session)
+  if not creds:
+    return
+
+  body = 'DCube host on Google App Engine'
+  session.log['status'] = 200
+  session.res.body = toolkit.create_json_response(status=200,
+      message='OK', creds=creds, body=body)
 
 def robots(session):
   session.res.headers['content-type'] = 'text/plain'

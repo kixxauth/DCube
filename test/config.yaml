@@ -98,3 +98,4 @@ protocol:
     - test_robots
     - test_docs
     - test_root
+    - test_authenticate

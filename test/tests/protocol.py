@@ -1,9 +1,12 @@
 import unittest
 
+import simplejson
 import test_utils
 
 HOST = test_utils.HOST
 LOCAL = test_utils.LOCAL
+ADMIN_USERNAME = test_utils.ADMIN_USERNAME
+PASSKEY = test_utils.ADMIN_PASSKEY
 
 class Basic(unittest.TestCase):
   def test_not_found(self):
@@ -200,7 +203,7 @@ class Basic(unittest.TestCase):
         url='/',
         body='[1,2,3]', # Valid JSON, but it's not an {} object.
         headers={
-          'User-Agent': 'UA:DCube test :: invalid JSON',
+          'User-Agent': 'UA:DCube test :: body not a dict',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 400)
@@ -220,19 +223,139 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.message, 'Bad Request')
     self.assertEqual(response.body, 'Missing DCube message "head" in ({})')
 
-    # The JSONRequest 'head' attribute must contain an 'method' attribute that
+    # The JSONRequest 'head' attribute must contain a 'method' attribute that
     # is is the name of the function to invoke on this url.
     response = test_utils.make_http_request(
         method='POST',
         url='/',
         body='{"head":{}}', # Valid JSON, but no 'method'.
         headers={
-          'User-Agent': 'UA:DCube test :: no authorization',
+          'User-Agent': 'UA:DCube test :: no method',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
     self.assertEqual(response.body, 'Missing DCube message header "method" in ({"head":{}})')
+
+  def test_authenticate(self):
+    """## Authenticating a user on the root '/' URL ##
+
+    The DCube protocol uses a robust and challenge response authentication
+    scheme that we call CHAP. It is similar to HTTP digest authentication, but
+    does not require the sever to store a plain text password, but hashed
+    password equivalents instead.
+
+    Our scheme is based on the description given by Paul Johnston on his
+    [website](http://pajhome.org.uk/crypt/md5/advancedauth.html#alternative).
+    On every request, the password equivalent stored on our servers is updated,
+    and never repeated.
+
+    This is a good security measure, but it is not easy to grasp on the first
+    try. So, take a look and then come back to it again later.
+
+    """
+    # We can't authenticate without the authorization part of the head.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: no authorization',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': None,
+      'head': {'status': 401,
+        'message': 'No authorization credentials.',
+        'authorization': []}})
+
+    # And the user name must be a string.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":[null,"x","y"]}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: null username',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': None,
+      'head': {'status': 401,
+        'message': 'Username "null" is invalid.',
+        'authorization': []}})
+
+    # If the user does not exist, the server does not send back authentication
+    # info.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=('{"head":{"method":"get",'
+              '"authorization":["not_really_aUser","x","y"]}}'),
+        headers={
+          'User-Agent': 'UA:DCube test :: user na',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': None,
+      'head': {'status': 401,
+        'message': 'Username "not_really_aUser" does not exist.',
+        'authorization': []}})
+
+    # We start a new session by just sending the username in the credentials.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s"]}}'% \
+            ADMIN_USERNAME,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    self.assertEqual(json['head']['message'], 'Authenticate.')
+    self.assertEqual(json['head']['authorization'][0], ADMIN_USERNAME)
+
+    # nonce and nextnonce are sha1 hashes that we must use to calculate the
+    # conce and response to authenticate the next call.
+    self.assertEqual(len(json['head']['authorization'][1]), 40)
+    self.assertEqual(len(json['head']['authorization'][2]), 40)
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
+
+    # With a cnonce and response computed from the user's passkey and the nonce
+    # and nextnonce sent from the host, we can authenticate this user.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (ADMIN_USERNAME, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200) # Authenticated.
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['authorization'][0], ADMIN_USERNAME)
+
+    # nonce and nextnonce are sha1 hashes that we must use to calculate the
+    # conce and response to authenticate the next call.
+    self.assertEqual(len(json['head']['authorization'][1]), 40)
+    self.assertEqual(len(json['head']['authorization'][2]), 40)
+
+    self.assertEqual(json['body'], 'DCube host on Google App Engine')
 
   def test_robots(self):
     """## Test the robots.txt call. ##

@@ -1,7 +1,10 @@
 import httplib
+import hashlib
 
 HOST = None
 LOCAL = True
+ADMIN_USERNAME = None
+ADMIN_PASSKEY = None
 
 class Prototype(object):
   pass
@@ -18,9 +21,33 @@ def make_http_request(method='POST', url='/', body=None, headers={}):
   cxn.close()
   return rv
 
-def setup(host, local):
+def create_credentials(passkey, username, nonce, nextnonce):
+  """Takes passkey, nonce, nextnonce and returns a tuple;
+  (username, cnonce, response)
+  """
+  def hash(s):
+    return hashlib.sha1(s).hexdigest()
+
+  def cnonce(key):
+    return hash(hash(key))
+
+  def response(key):
+    return hash(key)
+
+  def juxt(passkey, seed):
+    return str(passkey) + str(seed)
+
+  return (username,
+      cnonce(juxt(passkey, nextnonce)),
+      response(juxt(passkey, nonce)))
+
+def setup(host, local, username, passkey):
   global HOST
   global LOCAL
+  global ADMIN_USERNAME
+  global ADMIN_PASSKEY
 
   HOST = host
   LOCAL = local
+  ADMIN_USERNAME = username
+  ADMIN_PASSKEY = passkey
