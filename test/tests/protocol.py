@@ -490,7 +490,7 @@ class UserManagement(unittest.TestCase):
         'message': 'The URL "/users/" is not implemented on this host.',
         'authorization': []}})
 
-    # Accessing a url for a user that does not exists results in a DCube 404
+    # Accessing a url for a user that does not exist results in a DCube 404
     # "Not found." status.
     response = test_utils.make_http_request(
         method='POST',
@@ -507,3 +507,37 @@ class UserManagement(unittest.TestCase):
       'head': {'status': 404,
         'message': 'User "foo_user" could not be found.',
         'authorization': []}})
+
+    # A client can discover if a user exists by sending a DCube get message to
+    # the user URL. This does not require authentication.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% ADMIN_USERNAME,
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: get existing user',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': {'username': ADMIN_USERNAME},
+      'head': {'status': 200,
+        'message': 'OK',
+        'authorization': []}})
+
+    # A client can get all user data if the user is authenticated.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% ADMIN_USERNAME,
+        body=('{"head":{"method":"get","authorization":["%s"]}}'%
+          ADMIN_USERNAME),
+        headers={
+          'User-Agent': 'UA:DCube test :: get existing user',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['body'], {'username': ADMIN_USERNAME})
+    self.assertEqual(json['head']['status'], 200)
+

@@ -104,6 +104,8 @@ def get_public_user(authuser, level):
     user = store.get_baseuser(username)
     if user is None:
       return None
+    if authuser is None:
+      return {'username': username}
 
   return getPublicUser
 

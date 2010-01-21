@@ -8,7 +8,6 @@ import wsgiref.util
 import webob
 from google.appengine.ext.webapp import util
 from google.appengine.ext import webapp
-from django.utils import simplejson
 
 from rfc822 import formatdate as http_date
 
@@ -31,13 +30,6 @@ def request():
 
   return webob.Request(env, charset='utf-8',
       unicode_errors='ignore', decode_param_names=True)
-
-def create_json_response(status=200, message='ok', creds=[], body=None):
-  """Utility for creating the JSONResponse text for a DCube protocol request.
-  """
-  return simplejson.dumps(dict(
-      head=dict(status=status, message=message, authorization=creds),
-      body=body))
 
 def send_response(log, status, headers, body):
   """Send out an HTTP response.

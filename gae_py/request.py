@@ -187,6 +187,10 @@ class Response(Proto):
 class AuthUser(Proto):
   pass
 
+class DCubeResponse(Proto):
+  def update(self, new_attrs):
+    self.__dict__.update(new_attrs)
+
 class Session(object):
   def __init__(self, req, log, matches):
     self.req = req
@@ -206,7 +210,10 @@ class Session(object):
       'headers': headers,
       'body': ''})
 
-    self.authuser = AuthUser({'username': None, 'groups': ['users']})
+    self.authuser = AuthUser(
+        {'username': None, 'groups': ['users']})
+    self.dcube_response = DCubeResponse(
+        {'status':200,'message':'OK','creds':[],'body':None})
 
   @property
   def toresponse(self):
@@ -235,7 +242,7 @@ class Session(object):
     self.res.headers.update(headers)
     self.res.body = body
 
-  def prep_json(self, warn='ok', status=200, message='OK', creds=[], body=None):
+  def prep_json(self, **kwargs):
     """Update the Sesssion object for outputing a DCube JSON message.
 
     Args:
@@ -246,12 +253,15 @@ class Session(object):
       body: The DCube message body.
 
     """
-
-    self.log['status'] = status # This is the protocol status, not the http status
-    self.prep_http(warn, 200,
+    self.dcube_response.update(kwargs)
+    self.log['status'] = self.dcube_response.status # This is the protocol status, not the http status
+    self.prep_http(kwargs.get('warn') or 'ok', 200,
         {'content-type':'application/jsonrequest'},
-        toolkit.create_json_response(
-          status=status, message=message, creds=creds, body=body))
+        simplejson.dumps(dict(
+          head=dict(status=self.dcube_response.status,
+                    message=self.dcube_response.message,
+                    authorization=self.dcube_response.creds),
+          body=self.dcube_response.body)))
 
 def jsonrequest(f):
   def wrapper(session):
@@ -426,13 +436,17 @@ def users_url(session):
           message='User "%s" could not be found.'% username)
       return
 
+    # A get always returns a 200 OK DCube message.
+    session.prep_json(warn='ok', status=200, message='OK', body=user)
+    return
+
   # Implement a DCube "put" message response.
   if session.jsonrequest['head']['method'] == 'put':
-    pass
+    return
 
   # Implement a DCube "delete" message response.
   if session.jsonrequest['head']['method'] == 'delete':
-    pass
+    return
 
 def robots(session):
   # todo: We should not allow POST or PUT requests to robots.txt
