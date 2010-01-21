@@ -9,7 +9,7 @@ ADMIN_USERNAME = test_utils.ADMIN_USERNAME
 PASSKEY = test_utils.ADMIN_PASSKEY
 
 class Basic(unittest.TestCase):
-  """Define tests to examine basic functionality of this DCube host.
+  """## Define tests to examine basic functionality of this DCube host. ##
   
   These tests dive into the default "Not Found" response, the hosted doc pages,
   the JSONRequest protocol and the DCube message format on the root URL, CHAP
@@ -18,7 +18,7 @@ class Basic(unittest.TestCase):
   """
 
   def test_not_found(self):
-    """## Requesting a URL that does not exist. ##
+    """### Requesting a URL that does not exist. ###
 
     If an HTTP request is sent to a URL that does not exist on the DCube host
     the response will still be sent back. It can be expected to follow the specified
@@ -114,7 +114,7 @@ class Basic(unittest.TestCase):
     trivial_checks(response)
 
   def test_docs(self):
-    """## Protocol Documentation ##
+    """### Protocol Documentation ###
 
     The protocol documentation for this DCube host can be found at
     "http://fireworks-skylight.appspot.com/docs/"
@@ -134,7 +134,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 404)
 
   def test_root(self):
-    """## Basic HTTP calls to the root "/" url. ##
+    """### Basic HTTP calls to the root "/" url. ###
 
     The following HTTP calls to the root
     "http://fireworks-skylight.appspot.com/" url of the DCube api demonstrate
@@ -255,8 +255,27 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.message, 'Bad Request')
     self.assertEqual(response.body, 'Missing DCube message header "method" in ({"head":{}})')
 
+    # The root '/' url only accepts the 'get' DCube method
+    body = '{"head":{"method":"post"}}'
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: invalid method',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': None,
+      'head': {'status': 405,
+        'message': 'Invalid method "post".',
+        'authorization': []}})
+
   def test_authenticate(self):
-    """## Authenticating a user on the root '/' URL ##
+    """### Authenticating a user on the root '/' URL ###
 
     The DCube protocol uses a robust and challenge response authentication
     scheme that we call CHAP. It is similar to HTTP digest authentication, but
@@ -376,7 +395,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(json['body'], 'DCube host on Google App Engine')
 
   def test_robots(self):
-    """## Test the robots.txt call. ##
+    """### Test the robots.txt call. ###
 
     DCube also implements a simple robots.txt file for the web crawling bots
     that care to listen.
@@ -405,7 +424,35 @@ class Basic(unittest.TestCase):
 class UserManagement(unittest.TestCase):
 
   def test_check_user(self):
-    #
+    """### Explore different ways to get user data. ###
+
+    The following HTTP calls to "http://fireworks-skylight.appspot.com/users/"
+    url of the DCube api demonstrate the the various ways to get user data.
+      
+      * A call to "/users/" without making the username part of the URL will
+        result in a DCube 501 "Not implemented." So, for example,
+        "users/some_username" will work, but "/users/" will not.
+
+      * Like most urls in this protocol, all "/users/" URLs only implement the
+        HTTP "POST" method.
+
+      * Also, like most urls on this host, "/users/" URLs adhere to the
+        [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
+
+      * A call to any "/users/" URL does not require CHAP authentication,
+        but the information available to unauthenticated requests is limited to
+        the "get" DCube method only, and the only data returned is the
+        username.
+
+      * CHAP Authenticated calls to any "/users/" URL will allow access to.
+
+      * When a DCube "get" call is made to "/" it simply
+      authenticates the user, and if the user authenticates,
+      it responds with the host information.
+
+    """
+
+    # HTTP GET method is not allowed in DCube protocol.
     response = test_utils.make_http_request(
         method='GET',
         url='/users/foo_user',
@@ -415,7 +462,7 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.message, 'Method Not Allowed')
     self.assertEqual(response.body, 'HTTP method "GET" is invalid for DCube protocol.')
 
-    #
+    # HTTP PUT method is not allowed in DCube protocol.
     response = test_utils.make_http_request(
         method='PUT',
         url='/users/foo_user',
@@ -424,3 +471,39 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 405)
     self.assertEqual(response.message, 'Method Not Allowed')
     self.assertEqual(response.body, 'HTTP method "PUT" is invalid for DCube protocol.')
+
+    # Accessing '/users/' without a username URL results in a DCube 501 "Not
+    # implemented." status.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/',
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: get na user',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': None,
+      'head': {'status': 501,
+        'message': 'The URL "/users/" is not implemented on this host.',
+        'authorization': []}})
+
+    # Accessing a url for a user that does not exists results in a DCube 404
+    # "Not found." status.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/foo_user',
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: get na user',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'body': None,
+      'head': {'status': 404,
+        'message': 'User "foo_user" could not be found.',
+        'authorization': []}})

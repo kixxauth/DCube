@@ -70,12 +70,18 @@ def update_chap_user_creds(username, level):
   return updateChapUserCreds
 
 # todo: this should check the username == 'ROOT'
-def get_user_groups(username, level):
+def get_user_groups(auth_user, level):
   """Returns a function that will return the group membership list for the
   given username.
+
   """
-  def getUserGroups():
-    return store.getBaseUser(username).groups
+  assert auth_user == 'ROOT', \
+      'factory:: Only "ROOT" user may access get_user_groups().'
+  def getUserGroups(username):
+    user = store.get_baseuser(username)
+    if user is None:
+      return None
+    return user.groups
   return getUserGroups
 
 def create_new_user(username, level):
@@ -90,19 +96,14 @@ def create_new_user(username, level):
 
   return createNewUser
 
-def get_public_user(loggedin_username, level):
+def get_public_user(authuser, level):
   """Returns a function that will return the "public" attribes of the given
   user in the form of a dictionary.
   """
   def getPublicUser(username):
-    user = store.getBaseUser(username)
-    if user.nonce is None:
-      return None # user does not exist yet
-    if loggedin_username == username:
-      return {'username': username, 'groups': user.groups}
-    if level >= GROUPS['account_admin']['level']:
-      return {'username': username, 'groups': user.groups}
-    return {'username': username}
+    user = store.get_baseuser(username)
+    if user is None:
+      return None
 
   return getPublicUser
 

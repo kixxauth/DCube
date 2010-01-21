@@ -176,9 +176,16 @@ def old_main():
 
     ])
 
-class Response(object):
+
+class Proto(object):
   def __init__(self, attrs):
     self.__dict__ = attrs
+
+class Response(Proto):
+  pass
+
+class AuthUser(Proto):
+  pass
 
 class Session(object):
   def __init__(self, req, log, matches):
@@ -199,9 +206,15 @@ class Session(object):
       'headers': headers,
       'body': ''})
 
+    self.authuser = AuthUser({'username': None, 'groups': ['users']})
+
   @property
   def toresponse(self):
     return (self.log, self.res.status, self.res.headers, self.res.body)
+
+  def datastore_factory(self, interface):
+    return gate.get_builder(self.authuser.username,
+                         self.authuser.groups, interface)
 
   def prep_http(self,
       warn='ok',
@@ -310,6 +323,7 @@ def jsonrequest(f):
           session.req.body))
       return
 
+    json['head']['method'] = json['head']['method'].lower()
     session.log['method'] = json['head']['method']
     session.jsonrequest = json
     f(session) # Moving on now. Passing control back to the original function.
@@ -339,6 +353,9 @@ def dcube_authenticate(session):
         message='Username "%s" is invalid.'% username)
     return
 
+
+  session.authuser.groups = gate.get_builder(
+      'ROOT', ['ROOT'], 'get_user_groups')(username) or session.authuser.groups
   chap_user = gate.get_builder(
       'ROOT', ['ROOT'], 'get_chap_user_creds')(username)
   
@@ -362,39 +379,74 @@ def dcube_authenticate(session):
 
   if not auth_user.authenticated:
     session.prep_json(
-        warn='auth user does not exist',
+        warn='auth user not authenticated',
         status=401,
         creds=[username, auth_user.nonce, auth_user.nextnonce],
         message='Authenticate.')
     return
 
-  session.log['status'] = 200
+  session.authuser.username = username
+  session.prep_json(creds=[username, auth_user.nonce, auth_user.nextnonce])
   return [username, auth_user.nonce, auth_user.nextnonce]
 
 @jsonrequest
 def root_url(session):
+  if session.jsonrequest['head']['method'] != 'get':
+    session.prep_json(
+        warn='invalid method',
+        status=405,
+        message='Invalid method "%s".'% session.jsonrequest['head']['method'])
+    return
+
   creds = dcube_authenticate(session)
   if not creds:
     return
 
-  body = 'DCube host on Google App Engine'
-  session.log['status'] = 200
-  session.res.body = toolkit.create_json_response(status=200,
-      message='OK', creds=creds, body=body)
+  session.prep_json(creds=creds, body='DCube host on Google App Engine')
 
 @jsonrequest
 def users_url(session):
-  pass
+  username = session.url_matches[0]
+  if not username:
+    session.prep_json(
+        warn='cannot access /users/',
+        status=501,
+        message='The URL "/users/" is not implemented on this host.')
+    return
+
+  creds = dcube_authenticate(session)
+  user = session.datastore_factory('get_public_user')(username)
+
+  # Implement a DCube "get" message response.
+  if session.jsonrequest['head']['method'] == 'get':
+    if user is None:
+      session.prep_json(
+          warn='user not found',
+          status=404,
+          message='User "%s" could not be found.'% username)
+      return
+
+  # Implement a DCube "put" message response.
+  if session.jsonrequest['head']['method'] == 'put':
+    pass
+
+  # Implement a DCube "delete" message response.
+  if session.jsonrequest['head']['method'] == 'delete':
+    pass
 
 def robots(session):
   # todo: We should not allow POST or PUT requests to robots.txt
-  session.res.headers['content-type'] = 'text/plain'
-  session.res.headers['cache-control'] = 'public'
-  session.res.headers['last-modified'] = 'Fri, 1 Jan 2010 00:00:01 GMT'
-  session.res.headers['expires'] = toolkit.http_date(
-      time.time() + (toolkit.WEEK_SECS * 8))
-  session.res.body = 'User-agent: *\nDisallow: /'
+  session.prep_http(
+      warn='ok',
+      status=200,
+      headers={'content-type':'text/plain',
+               'cache-control':'public',
+               'last-modified':'Fri, 1 Jan 2010 00:00:01 GMT',
+               'expires':toolkit.http_date(
+                           time.time() + (toolkit.WEEK_SECS * 8))},
+      body='User-agent: *\nDisallow: /')
 
+# URL mapping to handler functions using regex
 handler_map = [
     (re.compile('^/$'), root_url),
     (re.compile('^/users/(.*)$'), users_url),
