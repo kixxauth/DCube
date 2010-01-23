@@ -102,10 +102,18 @@ def get_public_user(authuser, level):
   """
   def getPublicUser(username):
     user = store.get_baseuser(username)
+
+    # Not found.
     if user is None:
       return None
+
+    # Unauthenticated.
     if authuser is None:
       return {'username': username}
+
+    # Authenticated self.
+    if authuser == username:
+      return {'username': username, 'groups': user.groups}
 
   return getPublicUser
 

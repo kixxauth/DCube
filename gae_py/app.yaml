@@ -23,5 +23,5 @@ handlers:
 
 # One ring to rule them all.
 - url: /.*
-  script: request.py
+  script: handler.py
 

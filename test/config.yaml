@@ -96,10 +96,4 @@ protocol:
     tests:
     - test_not_found
     - test_robots
-    - test_docs
     - test_root
-    - test_authenticate
-
-  - name: UserManagement
-    tests:
-    - test_check_user

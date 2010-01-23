@@ -470,9 +470,6 @@ def main():
   req = toolkit.request()
   log = {'user-agent': req.headers['User-Agent']}
 
-  logging.debug('webob content-type: %s', req.content_type)
-  logging.debug('content-type header: %s', req.headers.get('content_type'))
-
   for rx, handler in handler_map:
     m = rx.match(req.path_info)
     if m is not None:
