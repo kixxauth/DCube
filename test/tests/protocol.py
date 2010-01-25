@@ -107,7 +107,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
     self.assertEqual(response.headers['content-type'], 'text/plain')
-    self.assertEqual(response.body, ('Invalid JSON text body : (invalid json)\n'))
+    self.assertEqual(response.body, ('Invalid JSON text body : (invalid json)'))
 
     # The body of the request must be a JSON encoded {} object.
     body = '[1,2,3]'
@@ -123,7 +123,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
     self.assertEqual(response.headers['content-type'], 'text/plain')
-    self.assertEqual(response.body, ('Invalid JSON text body : ([1,2,3])\n'))
+    self.assertEqual(response.body, ('Invalid JSON text body : ([1,2,3])'))
 
     # The JSONRequest body must contain a 'head' attribute that is a dictionary.
     body = '{}'
@@ -171,7 +171,6 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
-      'body': None,
       'head': {'status': 405,
         'message': 'Invalid method "post".'}})
 
@@ -204,10 +203,8 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
-      'body': None,
       'head': {'status': 401,
-        'message': 'No authorization credentials.',
-        'authorization': []}})
+        'message': 'No authorization credentials.'}})
 
     # And the user name must be a string.
     response = test_utils.make_http_request(
@@ -221,10 +218,8 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
-      'body': None,
       'head': {'status': 401,
-        'message': 'Username "null" is invalid.',
-        'authorization': []}})
+        'message': 'Username "null" is invalid.',}})
 
     # If the user does not exist, the server does not send back authentication
     # info.

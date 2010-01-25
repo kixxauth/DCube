@@ -1,158 +1,56 @@
-import os
-import sys
 import re
 import time
 
 import logging
 
-from rfc822 import formatdate as http_date
-from google.appengine.ext import webapp
-from django.utils import simplejson
+import http
+import jsonrequest
 
-class Proto(object):
-  def __init__(self, attrs):
-    self.__dict__ = attrs
+def credentials(head):
+  auth = head.get('authorization') or []
+  len_auth = len(auth)
 
-class Response(Proto):
-  pass
+  if not isinstance(auth, list) or len_auth is 0:
+    return None, None, None, 'No authorization credentials.'
 
-class Request(Proto):
-  pass
+  # auth[0] is username
+  if not isinstance(auth[0], basestring):
+    return (None, None, None, 'Username \\"%s\\" is invalid.'%
+      (auth[0] is None and 'null' or str(auth[0])))
 
-class ResponseHeaders():
-  def __init__(self, headers):
-    self.__headers = {}
-    self.update(headers)
+  if len_auth < 3:
+    return (auth[0], None, None, 'OK')
 
-  @staticmethod
-  def format_header(header):
-    head, val = header
-    return ('-'.join([s.capitalize() for s in head.split('-')]), val)
+  # auth[1] is the cnonce and auth[2] is the response
+  if not isinstance(auth[1], basestring):
+    return (auth[0], None, None, 'The given cnonce \\"%s\\" is invalid.'%
+      (auth[1] is None and 'null' or str(auth[1])))
+  if not isinstance(auth[2], basestring):
+    return (auth[0], auth[1], None, 'The given response \\"%s\\" is invalid.'%
+      (auth[2] is None and 'null' or str(auth[2])))
 
-  def update(self, headers):
-    self.__headers.update(
-        dict(
-          map(self.format_header, headers)))
+  return auth[0], auth[1], auth[2], 'OK'
 
-  @property
-  def out(self):
-    return self.__headers.items()
+def jsonrequest_root(request):
+  dcube_request, http_out = jsonrequest.load(request)
+  if dcube_request is None:
+    return http_out
 
-class Session(object):
-  def __init__(self, env):
-    headers = [
-          # Last-Modified right now
-          ('Last-Modified', http_date(time.time())),
-          # Expire time in the near future
-          ('Expires', http_date(time.time() + 360))
-        ]
+  if dcube_request.head['method'] != 'get':
+    return jsonrequest.invalid_method_out(dcube_request.head['method'])
 
-    try:
-      body = sys.stdin.read(int(
-            os.environ.get('CONTENT_LENGTH', '0')))
-    except ValueError:
-      body = ''
+  username, cnonce, response, msg = credentials(dcube_request.head)
+  if msg != 'OK':
+    return jsonrequest.message_out(401, msg)
 
-    self.response = Response({
-      'status': 200,
-      'headers': ResponseHeaders(headers),
-      'body': ''})
-
-    self.request = Request({
-      'content_type': env.get('CONTENT_TYPE'),
-      'body': body})
-
-  def write(self):
-    http_out(self.response.status,
-             self.response.headers.out,
-             self.response.body)
-
-class JSONRequest(object):
-  def __init__(self, session):
-    self.http = session
-
-    # The "Content-Type" header on the request must be application/jsonrequest.
-    if self.http.request.content_type != 'application/jsonrequest':
-      self.http.response.status = 415
-      self.valid = False
-      return
-
-    # We only accept valid JSON text in the request body
-    json = None
-    try:
-      json = simplejson.loads(self.http.request.body)
-    except: # todo: What error do we want to catch?
-      self.http.response.status = 400
-      self.http.response.headers.update([('content-type', 'text/plain')])
-      self.http.response.body = ('Invalid JSON text body : (%s)\n'%
-          self.http.request.body)
-      self.valid = False
-      return
-
-    # Only the {} dict object is acceptable as a message payload for the DCube
-    # protcol.
-    if not isinstance(json, dict):
-      self.http.response.status = 400
-      self.http.response.headers.update([('content-type', 'text/plain')])
-      self.http.response.body = ('Invalid JSON text body : (%s)\n'%
-          self.http.request.body)
-      self.valid = False
-      return
-
-    # Create the body object according to the DCube protocol.
-    if not isinstance(json.get('head'), dict):
-      self.http.response.status = 400
-      self.http.response.headers.update([('content-type', 'text/plain')])
-      self.http.response.body = ('Missing DCube message "head" in (%s)'%
-          self.http.request.body)
-      self.valid = False
-      return
-
-    if not isinstance(json['head'].get('method'), basestring):
-      self.http.response.status = 400
-      self.http.response.headers.update([('content-type', 'text/plain')])
-      self.http.response.body = ('Missing DCube message header "method" in (%s)'%
-          self.http.request.body)
-      self.valid = False
-      return
-
-    json['head']['method'] = json['head']['method'].lower()
-    self.request = Request({'head': json['head'], 'body': json.get('body')})
-    self.response = Response({'head': {'status': 200, 'message': 'OK'}, 'body': None})
-    self.valid = True
-
-  def write(self):
-    if self.valid:
-      http_out(self.http.response.status,
-               self.http.response.headers.out,
-               simplejson.dumps({'head': self.response.head, 'body': self.response.body}))
-    else:
-      http_out(self.http.response.status,
-               self.http.response.headers.out,
-               self.http.response.body)
-
-def robots(session):
-  session.response.headers.update([
-               ('content-type', 'text/plain'),
-               ('cache-control', 'public'),
-               ('last-modified', 'Fri, 1 Jan 2010 00:00:01 GMT'),
-               # Expires in 8 weeks
-               ('expires', http_date(time.time() + (604800 * 8)))])
-  session.response.body = 'User-agent: *\nDisallow: /'
-  return session
-
-def root(session):
-  session = JSONRequest(session)
-  if not session.valid:
-    return session
-
-  # The root '/' url only accepts the 'get' DCube method
-  if session.request.head['method'] != 'get':
-    session.response.head['status'] = 405
-    session.response.head['message'] = ('Invalid method "%s".'%
-        session.request.head['method'])
-    return session
-  return session
+def robots(request):
+  headers = [
+         ('content-type', 'text/plain'),
+         ('cache-control', 'public'),
+         ('last-modified', 'Fri, 1 Jan 2010 00:00:01 GMT'),
+         # Expires in 8 weeks
+         ('expires', http.formatdate(time.time() + (604800 * 8)))]
+  return 200, headers, 'User-agent: *\nDisallow: /'
 
 MAP = [
 
@@ -170,55 +68,47 @@ MAP = [
         ('POST', # Matches all HTTP methods.
           [
             ('application/jsonrequest', # Matches all accept MIME types.
-              root)])])
+              jsonrequest_root)])])
     ]
 
-def http_out(status, headers, body):
-    print "Status: %s" % ('%d %s' %
-        (status, webapp.Response.http_status_message(status)))
-    for name, val in headers:
-      print "%s: %s" % (name, val)
-    print
-    sys.stdout.write(body)
-
-def handle_request(env, handler):
-  handler(Session(env)).write()
-
-def handle_mime(env, mimes):
-  accept = env.get('HTTP_ACCEPT') or ''
-  for mime, handler in mimes:
-    if accept.find(mime) or mime == '*':
-      handle_request(env, handler)
-      return
-  # After checking all the mime types this handler is capable of without a
-  # match to the accept header of the user agent, we just use the last handler
-  # we have.
-  handle_request(env, handler)
-
-def handle_method(env, methods):
-  req_method = env.get('REQUEST_METHOD')
-  assert req_method, 'No HTTP method.'
-  for method, mimes in methods:
-    if method == req_method or method == '*':
-      handle_mime(env, mimes)
-      return
-  http_out(405, [('Allow', ','.join([m[0] for m in methods]))], '')
-
 def main():
-  env = dict(os.environ)
+  # Get the os environment variables as a dictionary. The os environs are set
+  # on every request.
+  env = http.get_environs()
+
   path = env.get('PATH_INFO')
+  # todo: Return 400 response in this case
   assert path, 'No PATH_INFO environment variable.'
-  for regex, methods in MAP:
-    if regex.match(path):
-      handle_method(env, methods)
-      return
+  match = http.match_url(MAP, path)
+  if match is None:
+    # Return 'Not Found' response.
+    http.out(404, [
+        ('Cache-Control', 'public'),
+        # Expires in 8 weeks.
+        ('Expires', http.formatdate(time.time() + (604800 * 8)))], '')
+    return
+  map, matched_groups = match
 
-  headers = [
-      ('Cache-Control', 'public'),
-      # Expires in 8 weeks.
-      ('Expires', http_date(time.time() + (604800 * 8)))]
-  http_out(404, headers, '')
+  req_method = env.get('REQUEST_METHOD')
+  # todo: Return 400 response in this case
+  assert req_method, 'No HTTP method.'
+  methods = http.match_method(map, req_method)
 
+  if methods is None:
+    # Return 'Method Not Alowed' response with a list of allowed methods.
+    http.out(405, [('Allow', ','.join([m[0] for m in map]))], '')
+    return
+
+  accept = env.get('HTTP_ACCEPT') or ''
+  status, headers, body = http.match_mime(methods, accept)(http.Request(env))
+  default_headers = {
+          # Last-Modified right now
+          'Last-Modified': http.formatdate(time.time()),
+          # Expire time in the near future
+          'Expires': http.formatdate(time.time() + 360)
+        }
+  headers = http.update_headers(default_headers, headers).items()
+  http.out(status, headers, body)
 
 if __name__ == '__main__':
   main()

@@ -97,3 +97,4 @@ protocol:
     - test_not_found
     - test_robots
     - test_root
+    - test_authenticate
