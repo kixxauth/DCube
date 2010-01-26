@@ -5,6 +5,8 @@ import logging
 
 import http
 import jsonrequest
+import store
+import pychap
 
 def credentials(head):
   auth = head.get('authorization') or []
@@ -42,6 +44,25 @@ def jsonrequest_root(request):
   username, cnonce, response, msg = credentials(dcube_request.head)
   if msg != 'OK':
     return jsonrequest.message_out(401, msg)
+
+  user = store.get_baseuser(username)
+  if user is None:
+    return jsonrequest.no_user_out(username)
+
+  assert user.nonce, 'user.nonce is expected to exist!'
+  assert user.nextnonce, 'user.nextnonce is expected to exist!'
+
+  if cnonce is None or response is None:
+    return jsonrequest.authenticate_out(username, user.nonce, user.nextnonce)
+
+  user.cnonce = cnonce
+  user.response = response
+  auth_user = pychap.authenticate(store.put_baseuser, user)
+  if not auth_user.authenticated:
+    return jsonrequest.authenticate_out(username, auth_user.nonce, auth_user.nextnonce)
+
+  return jsonrequest.out(
+      creds=[username, auth_user.nonce, auth_user.nextnonce], body='DCube host on Google App Engine.')
 
 def robots(request):
   headers = [

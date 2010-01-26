@@ -37,10 +37,29 @@ def load(request):
 
   return JSONRequest(json['head'], json.get('body')), None
 
-def message_out(status, message):
-  return (200, [('Content-Type', 'application/jsonrequest')],
-      '{"head":{"status":%d,"message":"%s"}}'% (status, message))
-
 def invalid_method_out(method):
   return message_out(405, 'Invalid method \\"%s\\".'% method)
 
+def no_user_out(username):
+  return message_out(401, 'Username \\"%s\\" does not exist.'% username)
+
+def valid_out(body):
+  return (200, [('Content-Type', 'application/jsonrequest')], body)
+
+def message_out(status, message):
+  return valid_out('{"head":{"status":%d,"message":"%s"}}'% (status, message))
+
+def authorization_out(status, message, username, nonce, nextnonce):
+  return valid_out('{"head":{"status":%d,"message":"%s",'
+      '"authorization":["%s","%s","%s"]}}'%
+      (status, message, username, nonce, nextnonce))
+
+def authenticate_out(username, nonce, nextnonce):
+  return authorization_out(401, 'Authenticate.', username, nonce, nextnonce)
+
+def out(status=200, message='OK', creds=[], body=None):
+  return valid_out(simplejson.dumps(dict(
+    head=dict(status=status,
+              message=message,
+              authorization=creds),
+    body=body)))

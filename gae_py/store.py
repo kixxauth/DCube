@@ -50,16 +50,12 @@ def get_baseuser(username):
   return user
 
 def put_baseuser(user):
-  logging.warn('USER.put() %s', user.username)
   ent = datastore.Entity(BaseUser.kind, name=BaseUser.prefix % user.username)
-  logging.warn('USER.put() before: (%s)', ent)
   for k in ['nonce', 'nextnonce', 'passkey', 'groups']:
     try:
       ent[k] = getattr(user, k)
     except AttributeError:
-      logging.warn('USER.put() property na %s', k)
-      #pass
-  logging.warn('USER.put() after: (%s)', ent)
+      pass
   datastore.Put(ent)
   return user
 

@@ -235,12 +235,11 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
-      'body': None,
       'head': {'status': 401,
-        'message': 'Username "not_really_aUser" does not exist.',
-        'authorization': []}})
+        'message': 'Username "not_really_aUser" does not exist.'}})
 
-    # We start a new session by just sending the username in the credentials.
+    # We start a new authenticated session by just sending the username in the
+    # credentials.
     response = test_utils.make_http_request(
         method='POST',
         url='/',
@@ -282,13 +281,40 @@ class Basic(unittest.TestCase):
     self.assertEqual(json['head']['status'], 200) # Authenticated.
     self.assertEqual(json['head']['message'], 'OK')
     self.assertEqual(json['head']['authorization'][0], ADMIN_USERNAME)
+    # We got access.
+    self.assertEqual(json['body'], 'DCube host on Google App Engine.')
 
     # nonce and nextnonce are sha1 hashes that we must use to calculate the
     # conce and response to authenticate the next call.
-    self.assertEqual(len(json['head']['authorization'][1]), 40)
-    self.assertEqual(len(json['head']['authorization'][2]), 40)
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    self.assertEqual(len(nonce), 40)
+    self.assertEqual(len(nextnonce), 40)
 
-    self.assertEqual(json['body'], 'DCube host on Google App Engine')
+    # If we send back a response with invalid credentials, we will be denied
+    # access.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (ADMIN_USERNAME, 'foostring', 'barstring'),
+        headers={
+          'User-Agent': 'UA:DCube test :: Auth denied.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    self.assertEqual(json['head']['message'], 'Authenticate.')
+    self.assertEqual(json['head']['authorization'][0], ADMIN_USERNAME)
+    # Denied access.
+    self.assertEqual(json.get('body'), None)
+
+    # nonce and nextnonce are sha1 hashes that we must use to calculate the
+    # conce and response to authenticate the next call have not changed since
+    # the last call because we did not authenticate.
+    self.assertEqual(json['head']['authorization'][1], nonce)
+    self.assertEqual(json['head']['authorization'][2], nextnonce)
 
   def test_robots(self):
     """### Test the robots.txt call. ###
