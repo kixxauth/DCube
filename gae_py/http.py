@@ -26,6 +26,7 @@ def out(status, headers, body):
   print
   # todo: Should we append a newline '\n'??
   sys.stdout.write(body)
+  return status, headers, body
 
 def format_header(header):
   head, val = header

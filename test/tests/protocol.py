@@ -2,6 +2,7 @@ import unittest
 
 import simplejson
 import test_utils
+import teardown
 
 HOST = test_utils.HOST
 LOCAL = test_utils.LOCAL
@@ -353,80 +354,11 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.headers['allow'], 'GET')
 
 class UserManagement(unittest.TestCase):
-  username = 'test_created_user'
-  passkey = 'key'
+  username = teardown.USERNAME
+  passkey = teardown.PASSKEY
 
-  def tearDown(self):
-    response = test_utils.make_http_request(
-        method='POST',
-        url='/users/%s'% self.username,
-        body=('{"head":{"method":"delete","authorization":["%s"]}}'%
-          self.username),
-        headers={
-          'User-Agent': 'UA:DCube test :: authenticating',
-          'Accept': 'application/jsonrequest',
-          'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 200)
-    json = simplejson.loads(response.body)
-    assert json['head']['status'] == 401 or json['head']['status'] == 404, \
-        'status is %d'% json['head']['status']
-
-    if json['head']['status'] == 404:
-      return
-
-    nonce = json['head']['authorization'][1]
-    nextnonce = json['head']['authorization'][2]
-
-    username, cnonce, response = test_utils.create_credentials(
-        self.passkey, self.username, nonce, nextnonce)
-
-    response = test_utils.make_http_request(
-        method='POST',
-        url='/users/%s'% self.username,
-        body='{"head":{"method":"delete", "authorization":["%s","%s","%s"]}}'% \
-            (username, cnonce, response),
-        headers={
-          'User-Agent': 'UA:DCube test :: Get all user data.',
-          'Accept': 'application/jsonrequest',
-          'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 200)
-    json = simplejson.loads(response.body)
-    self.assertEqual(json['head']['status'], 204)
-
-
-  def test_check_user(self):
-    """### Explore different ways to get user data. ###
-
-    The following HTTP calls to "http://fireworks-skylight.appspot.com/users/"
-    url of the DCube api demonstrate the the various ways to get user data.
-      
-      * A call to "/users/" without making the username part of the URL will
-        result in a DCube 501 "Not implemented." So, for example,
-        "users/some_username" will work, but "/users/" will not.
-
-      * Like most urls in this protocol, all "/users/" URLs only implement the
-        HTTP "POST" method.
-
-      * Also, like most urls on this host, "/users/" URLs adhere to the
-        [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
-
-      * A call to any "/users/" URL using the DCube "get" method does not
-        require CHAP authentication, but the information available to
-        unauthenticated requests is limited to the username only.
-
-      * CHAP Authenticated calls to any "/users/" URL will allow access to
-        privileged user data in some cases. In the case of a "get" request
-        additional user data will be returned if the authenticated user is a
-        member of the "user_admin" group, or the user himself. In the case of a
-        "delete" request, if the authenticated user is not the user himself,
-        the response is a DCube status "403 Forbidden". In the case of a "put"
-        request, if the user already exists, the authenticated user must be a
-        member of the "user_admin" group or the user himself to make the
-        requested changes.  If so, a 200 response is returned, and if not a 403
-        response is returned.
-
-      * If a "put" request is made on a user url that does not exist, the user
-        is created without requiring authentication.
+  def test_users_url(self):
+    """### The particularities of the "/users/" URL ###
 
     """
 
@@ -484,6 +416,42 @@ class UserManagement(unittest.TestCase):
       'head': {'status': 404,
         'message': 'User "foo_user" could not be found.'}})
 
+  def test_check_user(self):
+    """### Explore different ways to get user data. ###
+
+    The following HTTP calls to "http://fireworks-skylight.appspot.com/users/"
+    url of the DCube api demonstrate the the various ways to get user data.
+      
+      * A call to "/users/" without making the username part of the URL will
+        result in a DCube 501 "Not implemented." So, for example,
+        "users/some_username" will work, but "/users/" will not.
+
+      * Like most urls in this protocol, all "/users/" URLs only implement the
+        HTTP "POST" method.
+
+      * Also, like most urls on this host, "/users/" URLs adhere to the
+        [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
+
+      * A call to any "/users/" URL using the DCube "get" method does not
+        require CHAP authentication, but the information available to
+        unauthenticated requests is limited to the username only.
+
+      * CHAP Authenticated calls to any "/users/" URL will allow access to
+        privileged user data in some cases. In the case of a "get" request
+        additional user data will be returned if the authenticated user is a
+        member of the "user_admin" group, or the user himself. In the case of a
+        "delete" request, if the authenticated user is not the user himself,
+        the response is a DCube status "403 Forbidden". In the case of a "put"
+        request, if the user already exists, the authenticated user must be a
+        member of the "user_admin" group or the user himself to make the
+        requested changes.  If so, a 200 response is returned, and if not a 403
+        response is returned.
+
+      * If a "put" request is made on a user url that does not exist, the user
+        is created without requiring authentication.
+
+    """
+
     # A client can discover if a user exists by sending a DCube get message to
     # the user URL. This does not require authentication.
     response = test_utils.make_http_request(
@@ -538,8 +506,8 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 200)
-    self.assertEqual(json['body'], {'username': ADMIN_USERNAME, 'groups':['users', 'sys_admin']})
-
+    self.assertEqual(json['body'], {'username': ADMIN_USERNAME,
+      'groups':['users', 'sys_admin']})
 
   def test_create_user(self):
     """### Create a new user. ###
@@ -601,3 +569,106 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 401) # 401 Unauthenticated.
+
+  # This test must come after test_create_user().
+  def test_user_access(self):
+    """### User data access privileges.
+    
+    """
+
+    # Authenticate the new user.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s"]}}'% \
+            self.username,
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401)
+
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, nonce, nextnonce)
+
+    # A user who is not a member of the 'user_admin' group cannot access user
+    # data that does not belong to them.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ ADMIN_USERNAME,
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200) # Authenticated.
+    self.assertEqual(json['body'], {'username': ADMIN_USERNAME})
+
+    #nonce = json['head']['authorization'][1]
+    #nextnonce = json['head']['authorization'][2]
+    #username, cnonce, response = test_utils.create_credentials(
+        #self.passkey, self.username, nonce, nextnonce)
+
+    # Add test user to 'user_admin' group.
+    # A user can modify their own data if they are a member of a high enough group.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ ADMIN_USERNAME,
+        body='{"head":{"method":"get", "authorization":["%s"]}}'% \
+            ADMIN_USERNAME,
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ ADMIN_USERNAME,
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (ADMIN_USERNAME, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    user = json['body']
+    self.assertEqual(json['body']['username'], ADMIN_USERNAME)
+    assert isinstance(user['groups'], list)
+
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
+
+    # Add the 'user_admin' group.
+    if not 'user_admin' in user['groups']:
+      user['groups'].append('user_admin')
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ ADMIN_USERNAME,
+        body=simplejson.dumps({'head':{'method':'put','authorization':creds},'body':user}),
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+

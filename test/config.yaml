@@ -101,5 +101,7 @@ protocol:
 
   - name: UserManagement
     tests:
+    - test_users_url
     - test_check_user
     - test_create_user
+    - test_user_access

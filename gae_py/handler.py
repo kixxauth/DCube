@@ -7,6 +7,7 @@ import http
 import jsonrequest
 import store
 import pychap
+import groups
 
 class Prototype(object):
   pass
@@ -68,7 +69,7 @@ def authenticate(dcube_request):
     return (jsonrequest.authenticate_out(
       user.username, auth_user.nonce, auth_user.nextnonce), None)
 
-  return None, [user.username, auth_user.nonce, auth_user.nextnonce]
+  return None, auth_user
 
 def jsonrequest_users_get(dcube_request, user_url, user):
   if user is None:
@@ -86,32 +87,29 @@ def jsonrequest_users_get(dcube_request, user_url, user):
 
   # Try to authenticate
   authenticated_user = pychap.authenticate(store.put_baseuser, auth_user)
-  if not authenticated_user.authenticated: # Authentication failed.
-    return jsonrequest.out(
-        creds=[authenticated_user.username,
-               authenticated_user.nonce,
-               authenticated_user.nextnonce],
-        body={'username': user.username})
+  if authenticated_user.authenticated:
+    if authenticated_user.username == user_url or 'user_admin' in auth_user.groups:
+      # The user is requesting their own data or the authenticated user is a
+      # member of the 'user_admin' group, so we give it all to them.
+      return jsonrequest.out(
+          creds=[authenticated_user.username,
+                 authenticated_user.nonce,
+                 authenticated_user.nextnonce],
+          body={'username': user.username, 'groups': user.groups})
 
-  # The authentication succeeded. 
-  if user.username == user_url:
-    # The user is requesting their own data, so we give it all to them.
-    return jsonrequest.out(
-        creds=[authenticated_user.username,
-               authenticated_user.nonce,
-               authenticated_user.nextnonce],
-        body={'username': user.username, 'groups': user.groups})
-
-  # The authenticated user must be a member of the 'user_admin' group to get
-  # access to user data that does not belong to them.
-  assert False
+  # Limited response for no authentication.
+  return jsonrequest.out(
+      creds=[authenticated_user.username,
+             authenticated_user.nonce,
+             authenticated_user.nextnonce],
+      body={'username': user.username})
 
 def jsonrequest_users_delete(dcube_request, user_url, target_user):
   if target_user is None:
     return jsonrequest.message_out(404, 'User \\"%s\\" could not be found.'% user_url)
 
-  response, credentials = authenticate(dcube_request)
-  if credentials is None:
+  response, auth_user = authenticate(dcube_request)
+  if auth_user is None:
     return response
 
   store.delete_baseuser(user_url)
@@ -129,11 +127,24 @@ def jsonrequest_users_put(dcube_request, user_url, user):
                new_user.nextnonce],
         body={'username': new_user.username})
 
-  response, credentials = authenticate(dcube_request)
-  if credentials is None:
+  response, auth_user = authenticate(dcube_request)
+  if auth_user is None:
     return response
 
-  assert False
+  if auth_user.username == user.username:
+    user = auth_user
+
+  data = dcube_request.body
+  groups = data.get('groups')
+  if isinstance(groups, list):
+    user.groups = groups
+
+  store.put_baseuser(user)
+  return jsonrequest.out(status=200, message='Updated.',
+      creds=[user.username,
+             user.nonce,
+             user.nextnonce],
+      body={'username': user.username, 'groups': user.groups})
 
 def jsonrequest_users(request, user_url):
   if not user_url:
@@ -146,19 +157,21 @@ def jsonrequest_users(request, user_url):
 
   user = store.get_baseuser(user_url)
 
-  # Implement DCube "get" method.
-  if dcube_request.head['method'] == 'get':
-    return jsonrequest_users_get(dcube_request, user_url, user)
+  return ((dcube_request.head['method'] == 'get' and
+            # Implement DCube "get" method.
+            jsonrequest_users_get(dcube_request, user_url, user)) or
 
-  # Implement DCube "put" method.
-  if dcube_request.head['method'] == 'put':
-    return jsonrequest_users_put(dcube_request, user_url, user)
+          (dcube_request.head['method'] == 'put' and
+            # Implement DCube "put" method.
+            jsonrequest_users_put(dcube_request, user_url, user)) or
 
-  # Implement DCube "delete" method.
-  if dcube_request.head['method'] == 'delete':
-    return jsonrequest_users_delete(dcube_request, user_url, user)
+          (dcube_request.head['method'] == 'delete' and
+            # Implement DCube "delete" method.
+            jsonrequest_users_delete(dcube_request, user_url, user)) or
 
-  return jsonrequest.invalid_method_out(dcube_request.head['method'])
+          # No valid method.
+          jsonrequest.invalid_method_out(dcube_request.head['method'])
+        )
 
 def jsonrequest_root(request):
   dcube_request, http_out = jsonrequest.load(request)
@@ -168,12 +181,13 @@ def jsonrequest_root(request):
   if dcube_request.head['method'] != 'get':
     return jsonrequest.invalid_method_out(dcube_request.head['method'])
 
-  response, credentials = authenticate(dcube_request)
-  if credentials is None:
+  response, user = authenticate(dcube_request)
+  if user is None:
     return response
 
   return jsonrequest.out(
-      creds=credentials, body='DCube host on Google App Engine.')
+      creds=[user.username, user.nonce, user.nextnonce],
+      body='DCube host on Google App Engine.')
 
 def robots(request):
   headers = [
@@ -213,6 +227,30 @@ MAP = [
               robots)])])
     ]
 
+def handle_method(env, methods, matches):
+  accept = env.get('HTTP_ACCEPT') or ''
+  status, headers, body = http.match_mime(methods, accept)(http.Request(env), *matches)
+  default_headers = {
+          # Last-Modified right now
+          'Last-Modified': http.formatdate(time.time()),
+          # Expire time in the near future
+          'Expires': http.formatdate(time.time() + 360)
+        }
+  headers = http.update_headers(default_headers, headers).items()
+  http.out(status, headers, body)
+
+def handle_match(env, map, matches):
+  req_method = env.get('REQUEST_METHOD')
+  # todo: Return 400 response in this case
+  assert req_method, 'No HTTP method.'
+  methods = http.match_method(map, req_method)
+  ((methods is None and
+      # Return 'Method Not Alowed' response with a list of allowed methods.
+      http.out(405, [('Allow', ','.join([m[0] for m in map]))], '')) or
+      
+      # Found a handler for the HTTP method.
+      handle_method(env, methods, matches))
+
 def main():
   # Get the os environment variables as a dictionary. The os environs are set
   # on every request.
@@ -222,35 +260,16 @@ def main():
   # todo: Return 400 response in this case
   assert path, 'No PATH_INFO environment variable.'
   match = http.match_url(MAP, path)
-  if match is None:
-    # Return 'Not Found' response.
-    http.out(404, [
+
+  ((match is None and
+      # Return 'Not Found' response.
+      http.out(404, [
         ('Cache-Control', 'public'),
         # Expires in 8 weeks.
-        ('Expires', http.formatdate(time.time() + (604800 * 8)))], '')
-    return
-  map, matched_groups = match
+        ('Expires', http.formatdate(time.time() + (604800 * 8)))], '')) or
 
-  req_method = env.get('REQUEST_METHOD')
-  # todo: Return 400 response in this case
-  assert req_method, 'No HTTP method.'
-  methods = http.match_method(map, req_method)
-
-  if methods is None:
-    # Return 'Method Not Alowed' response with a list of allowed methods.
-    http.out(405, [('Allow', ','.join([m[0] for m in map]))], '')
-    return
-
-  accept = env.get('HTTP_ACCEPT') or ''
-  status, headers, body = http.match_mime(methods, accept)(http.Request(env), *matched_groups)
-  default_headers = {
-          # Last-Modified right now
-          'Last-Modified': http.formatdate(time.time()),
-          # Expire time in the near future
-          'Expires': http.formatdate(time.time() + 360)
-        }
-  headers = http.update_headers(default_headers, headers).items()
-  http.out(status, headers, body)
+      # Found a handler for this URL.
+      handle_match(env, *match))
 
 if __name__ == '__main__':
   main()
