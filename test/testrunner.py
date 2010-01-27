@@ -7,6 +7,7 @@ import yaml
 
 import suites
 from tests import test_utils
+from tests import teardown
 
 def checkhost(url):
   cxn = httplib.HTTPConnection(url)
@@ -140,8 +141,12 @@ def main():
 
   suites.run_suites(suites_)
 
+  # Teardown insecure user created for testing.
+  teardown.teardown()
   # If you remove this bit of functionality, I will shoot you.
+
   if host is localhost:
+    # Teardown local sys_admin user.
     cxn = httplib.HTTPConnection(localhost)
     cxn.request('DELETE', '/testsetup')
     response = cxn.getresponse()
