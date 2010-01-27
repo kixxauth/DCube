@@ -98,3 +98,8 @@ protocol:
     - test_robots
     - test_root
     - test_authenticate
+
+  - name: UserManagement
+    tests:
+    - test_check_user
+    - test_create_user

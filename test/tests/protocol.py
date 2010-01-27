@@ -353,6 +353,46 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.headers['allow'], 'GET')
 
 class UserManagement(unittest.TestCase):
+  username = 'test_created_user'
+  passkey = 'key'
+
+  def tearDown(self):
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% self.username,
+        body=('{"head":{"method":"delete","authorization":["%s"]}}'%
+          self.username),
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticating',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    assert json['head']['status'] == 401 or json['head']['status'] == 404, \
+        'status is %d'% json['head']['status']
+
+    if json['head']['status'] == 404:
+      return
+
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, nonce, nextnonce)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% self.username,
+        body='{"head":{"method":"delete", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: Get all user data.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 204)
+
 
   def test_check_user(self):
     """### Explore different ways to get user data. ###
@@ -370,16 +410,23 @@ class UserManagement(unittest.TestCase):
       * Also, like most urls on this host, "/users/" URLs adhere to the
         [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
 
-      * A call to any "/users/" URL does not require CHAP authentication,
-        but the information available to unauthenticated requests is limited to
-        the "get" DCube method only, and the only data returned is the
-        username.
+      * A call to any "/users/" URL using the DCube "get" method does not
+        require CHAP authentication, but the information available to
+        unauthenticated requests is limited to the username only.
 
-      * CHAP Authenticated calls to any "/users/" URL will allow access to.
+      * CHAP Authenticated calls to any "/users/" URL will allow access to
+        privileged user data in some cases. In the case of a "get" request
+        additional user data will be returned if the authenticated user is a
+        member of the "user_admin" group, or the user himself. In the case of a
+        "delete" request, if the authenticated user is not the user himself,
+        the response is a DCube status "403 Forbidden". In the case of a "put"
+        request, if the user already exists, the authenticated user must be a
+        member of the "user_admin" group or the user himself to make the
+        requested changes.  If so, a 200 response is returned, and if not a 403
+        response is returned.
 
-      * When a DCube "get" call is made to "/" it simply
-      authenticates the user, and if the user authenticates,
-      it responds with the host information.
+      * If a "put" request is made on a user url that does not exist, the user
+        is created without requiring authentication.
 
     """
 
@@ -391,7 +438,8 @@ class UserManagement(unittest.TestCase):
         headers={'User-Agent': 'UA:DCube test :: GET method not allowed'})
     self.assertEqual(response.status, 405)
     self.assertEqual(response.message, 'Method Not Allowed')
-    self.assertEqual(response.body, 'HTTP method "GET" is invalid for DCube protocol.')
+    # The "Allow" header indicates HTTP methods that are allowed.
+    self.assertEqual(response.headers['allow'], 'POST')
 
     # HTTP PUT method is not allowed in DCube protocol.
     response = test_utils.make_http_request(
@@ -401,7 +449,8 @@ class UserManagement(unittest.TestCase):
         headers={'User-Agent': 'UA:DCube test :: PUT method not allowed'})
     self.assertEqual(response.status, 405)
     self.assertEqual(response.message, 'Method Not Allowed')
-    self.assertEqual(response.body, 'HTTP method "PUT" is invalid for DCube protocol.')
+    # The "Allow" header indicates HTTP methods that are allowed.
+    self.assertEqual(response.headers['allow'], 'POST')
 
     # Accessing '/users/' without a username URL results in a DCube 501 "Not
     # implemented." status.
@@ -416,10 +465,8 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
-      'body': None,
       'head': {'status': 501,
-        'message': 'The URL "/users/" is not implemented on this host.',
-        'authorization': []}})
+        'message': 'The URL "/users/" is not implemented on this host.'}})
 
     # Accessing a url for a user that does not exist results in a DCube 404
     # "Not found." status.
@@ -434,10 +481,8 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
-      'body': None,
       'head': {'status': 404,
-        'message': 'User "foo_user" could not be found.',
-        'authorization': []}})
+        'message': 'User "foo_user" could not be found.'}})
 
     # A client can discover if a user exists by sending a DCube get message to
     # the user URL. This does not require authentication.
@@ -454,8 +499,7 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(json, {
       'body': {'username': ADMIN_USERNAME},
       'head': {'status': 200,
-        'message': 'OK',
-        'authorization': []}})
+        'message': 'OK'}})
 
     # A client can get all user data if the user is authenticated.
     response = test_utils.make_http_request(
@@ -494,4 +538,66 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 200)
-    self.assertEqual(json['body'], {'username': ADMIN_USERNAME, 'groups':'users'})
+    self.assertEqual(json['body'], {'username': ADMIN_USERNAME, 'groups':['users', 'sys_admin']})
+
+
+  def test_create_user(self):
+    """### Create a new user. ###
+    
+    """
+
+    # A new user can be easily creating by posting the user body to a user URL
+    # using the DCube "post" method without authentication.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% self.username,
+        body='{"head":{"method":"put"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: Get all user data.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 201) # 202 status "Created."
+    # A new user is created as a member of the 'users' group by default.
+    self.assertEqual(json['body'], {'username': self.username})
+
+    # The new user response includes the nonce and nextnonce sha1 hashes that
+    # we must use to calculate the conce and response to authenticate the next
+    # call.
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    self.assertEqual(len(nonce), 40)
+    self.assertEqual(len(nextnonce), 40)
+
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, nonce, nextnonce)
+
+    # The new user can retrieve all of their data with an authenticated DCube
+    # "get" request.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ self.username,
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200) # Authenticated.
+    self.assertEqual(json['body'], {'username': self.username, 'groups': ['users']})
+
+    # We cannot update an existing user without authenticating.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% self.username,
+        body='{"head":{"method":"put"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: Get all user data.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # 401 Unauthenticated.
