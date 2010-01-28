@@ -88,7 +88,7 @@ def jsonrequest_users_get(dcube_request, user_url, user):
   # Try to authenticate
   authenticated_user = pychap.authenticate(store.put_baseuser, auth_user)
   if authenticated_user.authenticated:
-    if authenticated_user.username == user_url or 'user_admin' in auth_user.groups:
+    if auth_user.username == user_url or 'user_admin' in auth_user.groups:
       # The user is requesting their own data or the authenticated user is a
       # member of the 'user_admin' group, so we give it all to them.
       return jsonrequest.out(
@@ -134,10 +134,18 @@ def jsonrequest_users_put(dcube_request, user_url, user):
   if auth_user.username == user.username:
     user = auth_user
 
-  data = dcube_request.body
-  groups = data.get('groups')
-  if isinstance(groups, list):
-    user.groups = groups
+  new_groups = dcube_request.body.get('groups')
+  if new_groups != user.groups and isinstance(new_groups, list):
+    def reduce_level(current_level, group):
+      if groups.map[group]['level'] > current_level:
+        current_level = groups.map[group]['level']
+      return current_level
+
+    level = reduce(reduce_level, auth_user.groups, 0)
+
+    for g in new_groups:
+      if not g in user.groups and groups.map[g]['level'] < level:
+        user.groups.append(g)
 
   store.put_baseuser(user)
   return jsonrequest.out(status=200, message='Updated.',
@@ -221,7 +229,7 @@ MAP = [
     # Web crawling robots take notice:
     (re.compile('/robots\.txt'), # Regex to match URL path.
       [
-        ('GET', # Matches all HTTP methods.
+        ('GET', # Only handles the 'GET' HTTP method.
           [
             ('*', # Matches all accept MIME types.
               robots)])])
