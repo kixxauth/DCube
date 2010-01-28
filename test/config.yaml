@@ -105,3 +105,7 @@ protocol:
     - test_check_user
     - test_create_user
     - test_user_access
+
+  - name: DatabaseManagement
+    tests:
+    - test_databases_url

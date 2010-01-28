@@ -71,6 +71,46 @@ def authenticate(dcube_request):
 
   return None, auth_user
 
+def jsonrequest_databases_get():
+  pass
+
+def jsonrequest_databases_put():
+  pass
+
+def jsonrequest_databases_delete():
+  pass
+
+def jsonrequest_databases(request, db_url):
+  if not db_url:
+    return jsonrequest.message_out(501,
+        'The URL \\"/databases/\\" is not implemented on this host.')
+
+  dcube_request, http_out = jsonrequest.load(request)
+  if dcube_request is None:
+    return http_out
+
+  db = store.get_database(db_url)
+  if db is None:
+    return jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db_url)
+
+  assert False
+
+  return ((dcube_request.head['method'] == 'get' and
+            # Implement DCube "get" method.
+            jsonrequest_databases_get(dcube_request, db_url)) or
+
+          (dcube_request.head['method'] == 'put' and
+            # Implement DCube "put" method.
+            jsonrequest_databases_put(dcube_request, db_url)) or
+
+          (dcube_request.head['method'] == 'delete' and
+            # Implement DCube "delete" method.
+            jsonrequest_databases_delete(dcube_request, db_url)) or
+
+          # No valid method.
+          jsonrequest.invalid_method_out(dcube_request.head['method'])
+        )
+
 def jsonrequest_users_get(dcube_request, user_url, user):
   if user is None:
     return jsonrequest.message_out(404, 'User \\"%s\\" could not be found.'% user_url)
@@ -144,8 +184,15 @@ def jsonrequest_users_put(dcube_request, user_url, user):
     level = reduce(reduce_level, auth_user.groups, 0)
 
     for g in new_groups:
-      if not g in user.groups and groups.map[g]['level'] < level:
-        user.groups.append(g)
+      if g in user.groups:
+        continue # The user already belongs to this group.
+      group_config = groups.map.get(g)
+      if group_config is None:
+        continue # The group does not exist.
+      if group_config['level'] > level:
+        continue # The user does not have permission for this group.
+      # Else add the user to the group.
+      user.groups.append(g)
 
   store.put_baseuser(user)
   return jsonrequest.out(status=200, message='Updated.',
@@ -216,6 +263,15 @@ MAP = [
             # Matches only the "application/jsonrequest" MIME type.
             ('application/jsonrequest',
               jsonrequest_root)])]),
+
+    # Database management "/databases/xyz" urls.
+    (re.compile('^/databases/(\w*)$'), # Regex to match URL path.
+      [
+        ('POST', # Matches only the POST HTTP method.
+          [
+            # Matches only the "application/jsonrequest" MIME type.
+            ('application/jsonrequest',
+              jsonrequest_databases)])]),
 
     # User management "/users/xyz" urls.
     (re.compile('^/users/(\w*)$'), # Regex to match URL path.

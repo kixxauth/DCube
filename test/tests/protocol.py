@@ -355,7 +355,7 @@ class Basic(unittest.TestCase):
         method='POST',
         url='/robots.txt',
         body=None,
-        headers={'User-Agent':'UA:DCube tests :: robots.text'})
+        headers={'User-Agent':'UA:DCube tests :: POST robots.text'})
 
     self.assertEqual(response.status, 405)
     self.assertEqual(response.headers['allow'], 'GET')
@@ -426,7 +426,7 @@ class UserManagement(unittest.TestCase):
         url='/users/',
         body='{"head":{"method":"get"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: get na user',
+          'User-Agent': 'UA:DCube test :: /users/ not implemented',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -439,17 +439,17 @@ class UserManagement(unittest.TestCase):
     # "Not found." status.
     response = test_utils.make_http_request(
         method='POST',
-        url='/users/foo_user',
+        url='/users/'+ self.username, # The test user should not exist yet.
         body='{"head":{"method":"get"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: get na user',
+          'User-Agent': 'UA:DCube test :: user not found',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
       'head': {'status': 404,
-        'message': 'User "foo_user" could not be found.'}})
+        'message': 'User "%s" could not be found.'% self.username}})
 
   def test_check_user(self):
     """### Explore different ways to get user data. ###
@@ -474,7 +474,7 @@ class UserManagement(unittest.TestCase):
         url='/users/%s'% ADMIN_USERNAME,
         body='{"head":{"method":"get"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: get existing user',
+          'User-Agent': 'UA:DCube test :: confirm existing user',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -548,7 +548,7 @@ class UserManagement(unittest.TestCase):
         url='/users/%s'% self.username,
         body='{"head":{"method":"put"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: Get all user data.',
+          'User-Agent': 'UA:DCube test :: Create new user.',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -576,7 +576,7 @@ class UserManagement(unittest.TestCase):
         body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
             (username, cnonce, response),
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: Get new auth user data.',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -590,7 +590,7 @@ class UserManagement(unittest.TestCase):
         url='/users/%s'% self.username,
         body='{"head":{"method":"put"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: Get all user data.',
+          'User-Agent': 'UA:DCube test :: Unauthenticated user update.',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -608,6 +608,10 @@ class UserManagement(unittest.TestCase):
         as they are a member of a group with the permissions needed to make the
         requested updates.
 
+      * An invalid update, because of group permissions or invalid data, will
+        silently fail.  A DCube 200 status response will be sent, but the
+        changes will not be made.
+
     """
 
     # Authenticate the new user.
@@ -617,7 +621,7 @@ class UserManagement(unittest.TestCase):
         body='{"head":{"method":"get", "authorization":["%s"]}}'% \
             self.username,
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: Auth new user',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -637,7 +641,7 @@ class UserManagement(unittest.TestCase):
         body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
             (username, cnonce, response),
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: not user_admin',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -660,7 +664,7 @@ class UserManagement(unittest.TestCase):
         body='{"head":{"method":"get", "authorization":["%s"]}}'% \
             ADMIN_USERNAME,
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: Authenticate.',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -679,7 +683,7 @@ class UserManagement(unittest.TestCase):
         body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
             (ADMIN_USERNAME, cnonce, response),
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: Auth get user.',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -703,7 +707,7 @@ class UserManagement(unittest.TestCase):
         url='/users/'+ ADMIN_USERNAME,
         body=simplejson.dumps({'head':{'method':'put','authorization':creds},'body':user}),
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: Update user.',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -711,8 +715,12 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(json['head']['status'], 200)
     user = json['body']
     assert isinstance(user['groups'], list)
+    # The test admin user updated their own data.
     assert 'user_admin' in user['groups'], 'groups: %s'% repr(user['groups'])
 
+    # An un-privileged user has limited ability to update even their own user
+    # data.
+    #
     # Get the credentials for the un-privleged test user.
     creds = test_utils.create_credentials(
         self.passkey, self.username, self.nonce, self.nextnonce)
@@ -724,7 +732,7 @@ class UserManagement(unittest.TestCase):
         url='/users/'+ self.username,
         body=simplejson.dumps({'head':{'method':'put','authorization':creds},'body':user}),
         headers={
-          'User-Agent': 'UA:DCube test :: Authorized',
+          'User-Agent': 'UA:DCube test :: no user update priv',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -735,7 +743,96 @@ class UserManagement(unittest.TestCase):
     # permission on a level higher than "user_admin".
     self.assertEqual(user['groups'], ['users'])
 
-class DatabaseManagement(unittest.TestCase):
+    # Updating a user with invalid data silently fails.
+    #
+    # Update the CHAP creds.
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, nonce, nextnonce)
 
-  def test_create_database(self):
-    pass
+    # Try to add the user to an "invalid_group".
+    user = {'username': self.username, 'groups': ['users', 'invalid_group']}
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ self.username,
+        body=simplejson.dumps(
+          {'head':{'method':'put','authorization':creds},'body':user}),
+        headers={
+          'User-Agent': 'UA:DCube test :: invalid user update',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200) # Silently fails.
+    user = json['body']
+    # The "user_admin" group was not added because the "invalid_group" does not
+    # exist.
+    self.assertEqual(user['groups'], ['users'])
+
+class DatabaseManagement(unittest.TestCase):
+  """ ## Database Management ##
+  """
+  # The temporary user that has been created for testing. The teardown module
+  # is called by the testrunner and will remove this user after the tests have
+  # completed.
+  username = teardown.USERNAME
+  passkey = teardown.PASSKEY
+
+  def test_databases_url(self):
+    """### The particularities of the "/databases/" URL ###
+    """
+
+    # HTTP GET method is not allowed in DCube protocol.
+    response = test_utils.make_http_request(
+        method='GET',
+        url='/databases/foo_db',
+        body=None,
+        headers={'User-Agent': 'UA:DCube test :: GET method not allowed'})
+    self.assertEqual(response.status, 405)
+    self.assertEqual(response.message, 'Method Not Allowed')
+    # The "Allow" header indicates HTTP methods that are allowed.
+    self.assertEqual(response.headers['allow'], 'POST')
+
+    # HTTP PUT method is not allowed in DCube protocol.
+    response = test_utils.make_http_request(
+        method='PUT',
+        url='/databases/foo_db',
+        body=None,
+        headers={'User-Agent': 'UA:DCube test :: PUT method not allowed'})
+    self.assertEqual(response.status, 405)
+    self.assertEqual(response.message, 'Method Not Allowed')
+    # The "Allow" header indicates HTTP methods that are allowed.
+    self.assertEqual(response.headers['allow'], 'POST')
+
+    # Accessing '/databases/' without a database URL results in a DCube 501 "Not
+    # implemented." status.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/',
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: /databases/ not implemented',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'head': {'status': 501,
+        'message': 'The URL "/databases/" is not implemented on this host.'}})
+
+    # Accessing a url for a database that does not exist results in a DCube 404
+    # "Not found." status.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/foo_db',
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: user not found',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'head': {'status': 404,
+        'message': 'Database "foo_db" could not be found.'}})
