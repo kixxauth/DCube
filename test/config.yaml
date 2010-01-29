@@ -4,87 +4,29 @@
 
 # All tests should go into 'full', which is the default
 full:
-- module: basic
+- module: protocol
+  
   classes:
-
-  - name: RobotsTxt
+  
+  - name: Basic
     tests:
-    - test_robotsTxt
+    - test_not_found
+    - test_robots
+    - test_root
+    - test_authenticate
 
-  - name: NotFound
+  - name: UserManagement
     tests:
-    - test_notFound
+    - test_users_url
+    - test_check_user
+    - test_create_user
+    - test_user_access
 
-  - name: SetupTestUsers
+  - name: DatabaseManagement
     tests:
-    - test_access
-
-  - name: JSONRequest
-    tests:
-    - test_invalidMethods
-    - test_invalidContentTypeHeader
-    - test_invalidAcceptHeader
-    - test_invalidJSONRequestBody
-    - test_invalids
-
-- module: users
-  classes:
-
-  - name: UsersURL
-    tests:
-    - test_methodNotAllowed
-    - test_noUserURL
-
-  - name: ExistingUser
-    tests:
-    - test_getUser
-    - test_putUser
-    - test_deleteUser
-    - test_nonExistingUser_get
-    - test_nonExistingUser_put
-    - test_nonExistingUser_delete
-
-  - name: NoUser
-    tests:
-    - test_getUser
-    - test_putUser
-    - test_deleteUser
-
-  - name: PrivUsers_BaseUser
-    tests:
-    - test_getBaseUser
-    - test_invalidGroup
-    - test_baseUser
-    - test_databaseUser
-    - test_accountUser
-    - test_userAdmin
-    - test_sys_admin
-
-- module: databases
-  classes:
-
-  - name: DatabasesURL
-    tests:
-    - test_method_not_allowed
-    - test_no_db_url
-
-  - name: CreateDatabase
-    tests:
-    - test_create_db
-
-# Just the database tests.
-databases:
-- module: databases
-  classes:
-
-  - name: DatabasesURL
-    tests:
-    - test_method_not_allowed
-    - test_no_db_url
-
-  - name: CreateDatabase
-    tests:
-    - test_create_db
+    - test_databases_url
+    - test_create_database
+    - test_database_update
 
 # The full set of DCube protocol tests
 protocol:
