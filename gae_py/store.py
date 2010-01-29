@@ -1,18 +1,5 @@
 """This module contains the models and utility functions for working with the
 App Engine datastore.
- 
-One of the design goals of our program is to provide limited access to data in
-the datastore based on a "Unix like" permissions system of users and user
-groups. The foundation for this design is to limit the possibility of
-programmer errors that could result in exposing more of the datastore than what
-is intended.
-
-Encapsulating this module is part of implementing that design goal.
-
-This module should only ever be imported into the 'factory' module
-(factory.py). That module provides the factory functions for properly working
-with the datastore, and the api of this module should not be directly accessed
-in any other way.
 """
 from google.appengine.ext import db
 from google.appengine.api import datastore
@@ -59,7 +46,7 @@ def put_baseuser(user):
     try:
       ent[k] = getattr(user, k)
     except AttributeError:
-      pass
+      user.__dict__[k] = None
   datastore.Put(ent)
   return user
 
