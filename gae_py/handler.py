@@ -12,6 +12,13 @@ import groups
 class Prototype(object):
   pass
 
+def dispatch(map, request_method, args):
+  for method, fun in map:
+    if request_method == method:
+      return fun(*args)
+
+  return jsonrequest.invalid_method_out(dcube_request.head['method'])
+
 def credentials(head):
   auth = head.get('authorization') or []
   len_auth = len(auth)
@@ -80,7 +87,17 @@ def jsonrequest_databases_get(request, dbname):
   if user is None:
     return jsonrequest.body_out('{"name":"%s"}'% db.name)
 
-  assert False
+  if user.username in db.owner_acl:
+    return jsonrequest.out(
+        creds=[user.username, user.nonce, user.nextnonce],
+        body={'name':db.name,
+          'owner_acl':db.owner_acl,
+          'manager_acl':db.manager_acl,
+          'user_acl':db.user_acl})
+
+  return jsonrequest.out(
+      creds=[user.username, user.nonce, user.nextnonce],
+      body={'name':db.name})
 
 def jsonrequest_databases_put(request, dbname):
   response, user = authenticate(request)
@@ -108,7 +125,9 @@ def jsonrequest_databases_delete(request, dbname):
     return response
 
   if 'sys_admin' not in user.groups:
-    return jsonrequest.message_out(403, 'User forbidden to remove a database.')
+    return jsonrequest.authorization_out(403,
+        'User forbidden to remove a database.',
+        user.username, user.nonce, user.nextnonce)
 
   logging.critical('Removing database "%s".', dbname)
   store.delete_database(dbname)
@@ -123,21 +142,12 @@ def jsonrequest_databases(request, db_url):
   if dcube_request is None:
     return http_out
 
-  return ((dcube_request.head['method'] == 'get' and
-            # Implement DCube "get" method.
-            jsonrequest_databases_get(dcube_request, db_url)) or
-
-          (dcube_request.head['method'] == 'put' and
-            # Implement DCube "put" method.
-            jsonrequest_databases_put(dcube_request, db_url)) or
-
-          (dcube_request.head['method'] == 'delete' and
-            # Implement DCube "delete" method.
-            jsonrequest_databases_delete(dcube_request, db_url)) or
-
-          # No valid method.
-          jsonrequest.invalid_method_out(dcube_request.head['method'])
-        )
+  return dispatch([
+      ('get', jsonrequest_databases_get),
+      ('put', jsonrequest_databases_put),
+      ('delete', jsonrequest_databases_delete)],
+    dcube_request.head['method'],
+    (dcube_request, db_url))
 
 def jsonrequest_users_get(dcube_request, user_url, user):
   if user is None:
@@ -180,6 +190,10 @@ def jsonrequest_users_delete(dcube_request, user_url, target_user):
   if auth_user is None:
     return response
 
+  if auth_user.username != user_url:
+    return jsonrequest.authorization_out(403, 'Deleting another user is forbidden.',
+        auth_user.username, auth_user.nonce, auth_user.nextnonce)
+
   store.delete_baseuser(user_url)
   return jsonrequest.message_out(204, 'Deleted user \\"%s\\".'% user_url)
 
@@ -205,8 +219,8 @@ def jsonrequest_users_put(dcube_request, user_url, user):
   new_groups = dcube_request.body.get('groups')
   if new_groups != user.groups and isinstance(new_groups, list):
     def reduce_level(current_level, group):
-      if groups.map[group]['level'] > current_level:
-        current_level = groups.map[group]['level']
+      if groups.MAP[group] > current_level:
+        current_level = groups.MAP[group]
       return current_level
 
     level = reduce(reduce_level, auth_user.groups, 0)
@@ -214,10 +228,10 @@ def jsonrequest_users_put(dcube_request, user_url, user):
     for g in new_groups:
       if g in user.groups:
         continue # The user already belongs to this group.
-      group_config = groups.map.get(g)
-      if group_config is None:
+      group_level = groups.MAP.get(g)
+      if group_level is None:
         continue # The group does not exist.
-      if group_config['level'] > level:
+      if group_level > level:
         continue # The user does not have permission for this group.
       # Else add the user to the group.
       user.groups.append(g)
@@ -240,21 +254,12 @@ def jsonrequest_users(request, user_url):
 
   user = store.get_baseuser(user_url)
 
-  return ((dcube_request.head['method'] == 'get' and
-            # Implement DCube "get" method.
-            jsonrequest_users_get(dcube_request, user_url, user)) or
-
-          (dcube_request.head['method'] == 'put' and
-            # Implement DCube "put" method.
-            jsonrequest_users_put(dcube_request, user_url, user)) or
-
-          (dcube_request.head['method'] == 'delete' and
-            # Implement DCube "delete" method.
-            jsonrequest_users_delete(dcube_request, user_url, user)) or
-
-          # No valid method.
-          jsonrequest.invalid_method_out(dcube_request.head['method'])
-        )
+  return dispatch([
+      ('get', jsonrequest_users_get),
+      ('put', jsonrequest_users_put),
+      ('delete', jsonrequest_users_delete)],
+    dcube_request.head['method'],
+    (dcube_request, user_url, user))
 
 def jsonrequest_root(request):
   dcube_request, http_out = jsonrequest.load(request)

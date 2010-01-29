@@ -719,6 +719,25 @@ class UserManagement(unittest.TestCase):
     # The test admin user updated their own data.
     assert 'user_admin' in user['groups'], 'groups: %s'% repr(user['groups'])
 
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
+
+    # A user may not delete another user, even a member of the sys_admin group.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ self.username,
+        body='{"head":{"method":"delete","authorization":["%s","%s","%s"]}}'% \
+            (ADMIN_USERNAME, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: Update user.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 403)
+
     # An un-privileged user has limited ability to update even their own user
     # data.
     #
@@ -932,15 +951,39 @@ class DatabaseManagement(unittest.TestCase):
     self.assertEqual(db['name'], self.database)
     self.assertEqual(db['owner_acl'], [ADMIN_USERNAME])
 
-    # Get the database we just created.
-    #
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Get the database we just created.  An authenticated user that is a
+    # manager or owner can get all of the database info.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: get db authenticated',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    db = json['body']
+    self.assertEqual(db,
+         {'name': self.database,
+          'owner_acl': [ADMIN_USERNAME],
+          'manager_acl': None,
+          'user_acl': None})
+
     # An unauthenticated user can get the database name.
     response = test_utils.make_http_request(
         method='POST',
         url='/databases/'+ self.database,
         body='{"head":{"method":"get"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: user not found',
+          'User-Agent': 'UA:DCube test :: get db unauthenticated',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
@@ -948,15 +991,47 @@ class DatabaseManagement(unittest.TestCase):
     self.assertEqual(json, {
       'head': {'status': 200, 'message': 'OK'},
       'body': {'name': self.database}})
-    #
-    # An authenticated user that is not a manager can get the database name.
-    #
-    # An authenticated user that is a manager or owner can get all of the
-    # database info.
 
-    #
-    # todo: Only a sys_admin user can remove a db.
-    #
+    # An authenticated user that is not a manager can get the database name.
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username,
+        self.nonce,
+        self.nextnonce)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body='{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: non owner get db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    db = json['body']
+    self.assertEqual(db,
+         {'name': self.database})
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # Only a sys_admin user can remove a db.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body='{"head":{"method":"delete", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: non owner get db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 403)
 
     """
 

@@ -1,31 +1,18 @@
+"""## Group permission level dictionary ##
+
+This module contains a dictionary mapping group names to permission levels.
 """
-A list of datastore interfaces and the groups that have permission on each one.
-Used by the gate and factory modules (gate.py)
-"""
 
-map = {
+MAP = {
+    'users': 0,
 
-    'users': {'level': 0, 'interfaces': [
-      'create_new_user',
-      'update_public_user',
-      'get_public_user',
-      'delete_user']},
+    'database': 60,
 
-    'database': {'level': 60, 'interfaces': [
-      'get_db',
-      'delete_db']},
+    'account_admin': 70,
 
-    'account_admin': {'level': 70, 'interfaces': [
-      ]},
+    'user_admin': 80,
 
-    'user_admin': {'level': 80, 'interfaces': [
-      ]},
+    'sys_admin': 90,
 
-    'sys_admin': {'level': 90, 'interfaces': [
-      ]},
-
-    'ROOT': {'level': 100, 'interfaces': [
-      'get_chap_user_creds',
-      'get_user_groups',
-      'update_chap_user_creds']}
+    'ROOT': 100
     }
