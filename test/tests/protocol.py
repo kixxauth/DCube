@@ -522,8 +522,9 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 200)
-    self.assertEqual(json['body'], {'username': ADMIN_USERNAME,
-      'groups':['users', 'sys_admin']})
+    user = json['body']
+    self.assertEqual(user['username'], ADMIN_USERNAME)
+    assert isinstance(user['groups'], list)
 
   def test_create_user(self):
     """### Create a new user. ###
@@ -778,6 +779,7 @@ class DatabaseManagement(unittest.TestCase):
   # completed.
   username = teardown.USERNAME
   passkey = teardown.PASSKEY
+  database = teardown.DATABASE
 
   def test_databases_url(self):
     """### The particularities of the "/databases/" URL ###
@@ -786,7 +788,7 @@ class DatabaseManagement(unittest.TestCase):
     # HTTP GET method is not allowed in DCube protocol.
     response = test_utils.make_http_request(
         method='GET',
-        url='/databases/foo_db',
+        url='/databases/'+ self.database,
         body=None,
         headers={'User-Agent': 'UA:DCube test :: GET method not allowed'})
     self.assertEqual(response.status, 405)
@@ -797,7 +799,7 @@ class DatabaseManagement(unittest.TestCase):
     # HTTP PUT method is not allowed in DCube protocol.
     response = test_utils.make_http_request(
         method='PUT',
-        url='/databases/foo_db',
+        url='/databases/'+ self.database,
         body=None,
         headers={'User-Agent': 'UA:DCube test :: PUT method not allowed'})
     self.assertEqual(response.status, 405)
@@ -825,7 +827,7 @@ class DatabaseManagement(unittest.TestCase):
     # "Not found." status.
     response = test_utils.make_http_request(
         method='POST',
-        url='/databases/foo_db',
+        url='/databases/'+ self.database, # The test db should not exist yet.
         body='{"head":{"method":"get"}}',
         headers={
           'User-Agent': 'UA:DCube test :: user not found',
@@ -835,4 +837,171 @@ class DatabaseManagement(unittest.TestCase):
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
       'head': {'status': 404,
-        'message': 'Database "foo_db" could not be found.'}})
+        'message': 'Database "%s" could not be found.'% self.database}})
+
+  def test_create_database(self):
+    """### Create a new database. ###
+
+    """
+
+    # An unauthenticated user cannot create a database.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database, # The test db should not exist yet.
+        body='{"head":{"method":"put"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: Unauthenticated database put',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401)
+    self.assertEqual(json['head']['message'], 'No authorization credentials.')
+
+    # Authenticate the test user.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database, # The test db should not exist yet.
+        body='{"head":{"method":"put", "authorization":["%s"]}}'% \
+            self.username,
+        headers={
+          'User-Agent': 'UA:DCube test :: Auth test user',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401)
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # A user who is not a member of the "database" group cannot create a
+    # database.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database, # The test db should not exist yet.
+        body='{"head":{"method":"put", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to create db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    # Authenticated but forbidden.
+    self.assertEqual(json['head']['status'], 403)
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test admin user.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s"]}}'% \
+            ADMIN_USERNAME,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # The test admin user should be a member of the "database" group and may
+    # create a database.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database, # The test db should not exist yet.
+        body='{"head":{"method":"put", "authorization":["%s","%s","%s"]}}'% \
+            (username, cnonce, response),
+        headers={
+          'User-Agent': 'UA:DCube test :: create new db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 201)
+    db = json['body']
+    self.assertEqual(db['name'], self.database)
+    self.assertEqual(db['owner_acl'], [ADMIN_USERNAME])
+
+    # Get the database we just created.
+    #
+    # An unauthenticated user can get the database name.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body='{"head":{"method":"get"}}',
+        headers={
+          'User-Agent': 'UA:DCube test :: user not found',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'head': {'status': 200, 'message': 'OK'},
+      'body': {'name': self.database}})
+    #
+    # An authenticated user that is not a manager can get the database name.
+    #
+    # An authenticated user that is a manager or owner can get all of the
+    # database info.
+
+    #
+    # todo: Only a sys_admin user can remove a db.
+    #
+
+    """
+
+    # Get the test user data.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ self.username,
+        body=simplejson.dumps({'head':{'method':'get','authorization':creds}}),
+        headers={
+          'User-Agent': 'UA:DCube test :: get test user.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    user = json['body']
+
+    assert isinstance(user.get('groups'), list), 'user: %s'% repr(user)
+
+    # Add the test user to the "database" group.
+    if 'database' not in user['groups']:
+      user['groups'].append('database')
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+ 
+    # Put the test user back.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/'+ self.username,
+        body=simplejson.dumps({'head':{'method':'put', 'authorization': creds},
+          'body': user}),
+        headers={
+          'User-Agent': 'UA:DCube test :: test user to database group.',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    user = json['body']
+    assert 'database' in user['groups']
+
+    # Get the credentials for the test user.
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+        """

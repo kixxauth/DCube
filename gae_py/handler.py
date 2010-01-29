@@ -71,14 +71,48 @@ def authenticate(dcube_request):
 
   return None, auth_user
 
-def jsonrequest_databases_get():
-  pass
+def jsonrequest_databases_get(request, dbname):
+  db = store.get_database(dbname)
+  if db is None:
+    return jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% dbname)
 
-def jsonrequest_databases_put():
-  pass
+  response, user = authenticate(request)
+  if user is None:
+    return jsonrequest.body_out('{"name":"%s"}'% db.name)
 
-def jsonrequest_databases_delete():
-  pass
+  assert False
+
+def jsonrequest_databases_put(request, dbname):
+  response, user = authenticate(request)
+  if user is None:
+    return response
+
+  if 'database' not in user.groups:
+    return jsonrequest.authorization_out(403,
+        'User is forbidden to create or modify a database.',
+        user.username, user.nonce, user.nextnonce)
+
+  db = Prototype()
+  db.name = dbname
+  db.owner_acl = [user.username]
+  store.put_database(db)
+  return jsonrequest.out(201, 'Created.',
+      creds=[user.username,
+             user.nonce,
+             user.nextnonce],
+      body={'name': db.name, 'owner_acl': db.owner_acl})
+
+def jsonrequest_databases_delete(request, dbname):
+  response, user = authenticate(request)
+  if user is None:
+    return response
+
+  if 'sys_admin' not in user.groups:
+    return jsonrequest.message_out(403, 'User forbidden to remove a database.')
+
+  logging.critical('Removing database "%s".', dbname)
+  store.delete_database(dbname)
+  return jsonrequest.message_out(204, 'Deleted database \\"%s\\".'% dbname)
 
 def jsonrequest_databases(request, db_url):
   if not db_url:
@@ -88,12 +122,6 @@ def jsonrequest_databases(request, db_url):
   dcube_request, http_out = jsonrequest.load(request)
   if dcube_request is None:
     return http_out
-
-  db = store.get_database(db_url)
-  if db is None:
-    return jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db_url)
-
-  assert False
 
   return ((dcube_request.head['method'] == 'get' and
             # Implement DCube "get" method.

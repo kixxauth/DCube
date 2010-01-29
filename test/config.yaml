@@ -109,3 +109,4 @@ protocol:
   - name: DatabaseManagement
     tests:
     - test_databases_url
+    - test_create_database
