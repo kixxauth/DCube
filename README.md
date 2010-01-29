@@ -56,6 +56,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+### See also LICENSE in the source tree. ###
+
   [1]:http://www.w3.org/RDF/
   [2]:http://www.ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm
   [3]:http://www.json.org/JSONRequest.html

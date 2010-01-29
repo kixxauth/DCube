@@ -1,6 +1,24 @@
 Release Notes for DCube
 =======================
 
+0.3 Jan 29, 2010
+----------------
+
+- Removed the the smoke and mirrors proxy interface to the App Engine datastore
+  and left the security issues up to the handler functions. This reduced the
+  complexity of the overall program, but made attention to data security in the
+  handler functions imperative.
+
+- Removed the session handling object/module and the WebOb dependency. This was
+  done in large part to attempt a more functional programming idiom.
+
+- Refactored the automating testing to be more explicit.
+
+- Full DCube user management functionality using the JSONRequest protocol.
+
+- Full DCube database management functionality using the JSONRequest protocol.
+
+
 0.1 Jan 4, 2010
 ---------------
 
