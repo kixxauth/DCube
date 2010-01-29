@@ -43,7 +43,12 @@ def main():
     if user is None:
       user = type('Proto', (object,),
           {'username': TEMP_TEST_USERNAME,
-           'groups': ['users', 'sys_admin', 'user_admin', 'database']})()
+           'groups': [
+             'users',
+             'sys_admin',
+             'user_admin',
+             'account_admin',
+             'database']})()
       import pychap
       pychap.authenticate(store.put_baseuser, user)
 

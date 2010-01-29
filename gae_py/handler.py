@@ -87,7 +87,8 @@ def jsonrequest_databases_get(request, dbname):
   if user is None:
     return jsonrequest.body_out('{"name":"%s"}'% db.name)
 
-  if user.username in db.owner_acl:
+  managers = db.manager_acl or []
+  if user.username in db.owner_acl or user.username in managers:
     return jsonrequest.out(
         creds=[user.username, user.nonce, user.nextnonce],
         body={'name':db.name,
@@ -104,20 +105,70 @@ def jsonrequest_databases_put(request, dbname):
   if user is None:
     return response
 
-  if 'database' not in user.groups:
-    return jsonrequest.authorization_out(403,
-        'User is forbidden to create or modify a database.',
-        user.username, user.nonce, user.nextnonce)
+  db = store.get_database(dbname)
+  
+  if db is None:
+    if 'database' not in user.groups:
+      return jsonrequest.authorization_out(403,
+          'User is forbidden to create or modify a database.',
+          user.username, user.nonce, user.nextnonce)
 
-  db = Prototype()
-  db.name = dbname
-  db.owner_acl = [user.username]
-  store.put_database(db)
-  return jsonrequest.out(201, 'Created.',
+    db = Prototype()
+    db.name = dbname
+    db.owner_acl = [user.username]
+    db = store.put_database(db)
+    return jsonrequest.out(201, 'Created.',
+        creds=[user.username,
+               user.nonce,
+               user.nextnonce],
+        body={
+          'name': db.name,
+          'owner_acl': db.owner_acl,
+          'manager_acl': db.manager_acl,
+          'user_acl': db.user_acl})
+
+  new_owner_acl = request.body.get('owner_acl')
+  if isinstance(new_owner_acl, list) and new_owner_acl != db.owner_acl:
+    if 'account_admin' not in user.groups:
+      return jsonrequest.authorization_out(403,
+          'User is forbidden to modify the owner access list of a database.',
+          user.username, user.nonce, user.nextnonce)
+
+    db.owner_acl = new_owner_acl
+
+  new_manager_acl = request.body.get('manager_acl')
+  if isinstance(new_manager_acl, list) and new_manager_acl != db.manager_acl:
+    if user.username in db.owner_acl or 'account_admin' in user.groups:
+      db.manager_acl = new_manager_acl
+
+    else:
+      return jsonrequest.authorization_out(403,
+          'User is forbidden to modify the manager access list of this database.',
+          user.username, user.nonce, user.nextnonce)
+
+  new_user_acl = request.body.get('user_acl')
+  manager_acl = db.manager_acl or []
+  if isinstance(new_user_acl, list) and new_user_acl != db.user_acl:
+    if user.username in db.owner_acl or \
+        user.username in manager_acl or \
+        'account_admin' in user.groups:
+      db.user_acl = new_user_acl
+
+    else:
+      return jsonrequest.authorization_out(403,
+          'User is forbidden to modify the user access list of this database.',
+          user.username, user.nonce, user.nextnonce)
+
+  db = store.put_database(db)
+  return jsonrequest.out(200, 'Updated.',
       creds=[user.username,
              user.nonce,
              user.nextnonce],
-      body={'name': db.name, 'owner_acl': db.owner_acl})
+      body={
+        'name': db.name,
+        'owner_acl': db.owner_acl,
+        'manager_acl': db.manager_acl,
+        'user_acl': db.user_acl})
 
 def jsonrequest_databases_delete(request, dbname):
   response, user = authenticate(request)

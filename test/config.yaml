@@ -110,3 +110,4 @@ protocol:
     tests:
     - test_databases_url
     - test_create_database
+    - test_database_update

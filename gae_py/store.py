@@ -87,7 +87,7 @@ def put_database(db):
     try:
       ent[k] = getattr(db, k)
     except AttributeError:
-      pass
+      db.__dict__[k] = None
   datastore.Put(ent)
   return db
 

@@ -792,7 +792,15 @@ class UserManagement(unittest.TestCase):
 
 class DatabaseManagement(unittest.TestCase):
   """ ## Database Management ##
+
+  This class defines a set of tests that demonstrate the database management
+  functionality of a DCube host.
+
+  All HTTP requests made to manage any database are made to the  "/databases/"
+  URL.  These tests will create, get, and update database metadata.
+
   """
+
   # The temporary user that has been created for testing. The teardown module
   # is called by the testrunner and will remove this user after the tests have
   # completed.
@@ -802,6 +810,25 @@ class DatabaseManagement(unittest.TestCase):
 
   def test_databases_url(self):
     """### The particularities of the "/databases/" URL ###
+
+    Every database has a unique URI that can be resolved to a full URL. For
+    example, "/databases/foo_database" implements all the database management
+    functionality for the database "foo_database" and may resolve to
+    "http://fireworks-skylight.appspot.com/databases/foo_user".
+      
+      * Like most URLs in this protocol, "/databases/" only implements the HTTP "POST"
+      method.
+
+      * Also, like most urls in this protocol, "/databases/" adheres to the
+      [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
+
+      * The base "/databases/" URL is not implemented and will return a DCube 501
+        response if it is called.
+
+      * If a database does not exist, a request to the database URI (ie:
+        "/databases/foo_database") will return a DCube 404 response. This is
+        the ideal method to determine if a database exists before trying to
+        create it.
     """
 
     # HTTP GET method is not allowed in DCube protocol.
@@ -860,6 +887,23 @@ class DatabaseManagement(unittest.TestCase):
 
   def test_create_database(self):
     """### Create a new database. ###
+
+    In this test we actually test access methods and permissions of a new
+    database after creating it.
+
+      * A user must authenticate and must be a member of the "database"
+        permission group level to create a new database.
+
+      * Any unauthenticated user can make a DCube "get" request to a database
+        URL, but the information returned will be limited to the database name
+        only.
+
+      * An authenticated user who is also in the "owner access list" or
+        "manager access list" of the database will get all of the database info
+        returned in a response to a DCube "get" request.
+
+      * Only an authenticated user that is a member of the sys_admin permission
+        level group can delete a datbase.
 
     """
 
@@ -1011,8 +1055,7 @@ class DatabaseManagement(unittest.TestCase):
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 200)
     db = json['body']
-    self.assertEqual(db,
-         {'name': self.database})
+    self.assertEqual(db, {'name': self.database})
 
     self.nonce = json['head']['authorization'][1]
     self.nextnonce = json['head']['authorization'][2]
@@ -1033,50 +1076,237 @@ class DatabaseManagement(unittest.TestCase):
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 403)
 
+  def test_database_update(self):
+    """### Update a database. ###
     """
 
-    # Get the test user data.
+    # An unauthenticated user cannot update a database.
     response = test_utils.make_http_request(
         method='POST',
-        url='/users/'+ self.username,
-        body=simplejson.dumps({'head':{'method':'get','authorization':creds}}),
+        url='/databases/'+ self.database, # The test db should not exist yet.
+        body='{"head":{"method":"put"}}',
         headers={
-          'User-Agent': 'UA:DCube test :: get test user.',
+          'User-Agent': 'UA:DCube test :: Unauthenticated database put',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
-    self.assertEqual(json['head']['status'], 200)
-    user = json['body']
+    self.assertEqual(json['head']['status'], 401)
+    self.assertEqual(json['head']['message'], 'No authorization credentials.')
 
-    assert isinstance(user.get('groups'), list), 'user: %s'% repr(user)
+    # Authenticate the test user.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database, # The test db should not exist yet.
+        body='{"head":{"method":"put", "authorization":["%s"]}}'% \
+            self.username,
+        headers={
+          'User-Agent': 'UA:DCube test :: Auth test user',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401)
 
-    # Add the test user to the "database" group.
-    if 'database' not in user['groups']:
-      user['groups'].append('database')
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
 
+    # A user who is not a member of the owner access list for this database
+    # cannot update manager access list.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({'head':{'method':'put','authorization':creds},
+          'body':{'name':self.database, 'manager_acl':[self.username]}}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to update db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    # Authenticated but the operation was forbidden.
+    self.assertEqual(json['head']['status'], 403)
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # A user who is not a member of the manager ACL or owner ACL for this
+    # database cannot update user ACL.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({'head':{'method':'put','authorization':creds},
+          'body':{'name':self.database, 'user_acl':['foo_user']}}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to update db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    # Authenticated but the operation was forbidden.
+    self.assertEqual(json['head']['status'], 403)
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test admin user
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s"]}}'% \
+            ADMIN_USERNAME,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
     creds = test_utils.create_credentials(
         PASSKEY, ADMIN_USERNAME,
         json['head']['authorization'][1],
         json['head']['authorization'][2])
- 
-    # Put the test user back.
+
+    # An authenticated user who is a member of the owner access list can add a
+    # user to the manager access list.
     response = test_utils.make_http_request(
         method='POST',
-        url='/users/'+ self.username,
-        body=simplejson.dumps({'head':{'method':'put', 'authorization': creds},
-          'body': user}),
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({'head':{'method':'put','authorization':creds},
+          'body':{'name':self.database, 'manager_acl':[self.username]}}),
         headers={
-          'User-Agent': 'UA:DCube test :: test user to database group.',
+          'User-Agent': 'UA:DCube test :: no permission to create db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    db = json['body']
+    self.assertEqual(db['manager_acl'], [self.username])
+    self.admin_creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # An authenticated user who is not on the owner ACL for a database cannot
+    # add users to the manager access list.
+    db['manager_acl'].append('foo_user')
+
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({
+          'head':{'method':'put','authorization':creds},
+          'body':db}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to update db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    # Authenticated, but forbidden to update.
+    self.assertEqual(json['head']['status'], 403)
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # An authenticated user that is on the manager ACL can add users to the
+    # users ACL.
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({'head':{'method':'put','authorization':creds},
+          'body':{'name':self.database, 'user_acl':['foo_user']}}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to update db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    # Authenticated but the operation was forbidden.
+    self.assertEqual(json['head']['status'], 200)
+    self.assertEqual(json['body']['user_acl'], ['foo_user'])
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # A user who is a member of the "account_admin" permission level group can
+    # add a user to the owner access list of a database.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({'head':{'method':'put','authorization':self.admin_creds},
+          'body':{'owner_acl':[ADMIN_USERNAME, self.username]}}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to create db',
           'Accept': 'application/jsonrequest',
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 200)
-    user = json['body']
-    assert 'database' in user['groups']
+    db = json['body']
+    self.assertEqual(db['owner_acl'], [ADMIN_USERNAME, self.username])
 
-    # Get the credentials for the test user.
-    username, cnonce, response = test_utils.create_credentials(
+    self.admin_creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # An authenticated user who is not an admin, but is on the owner ACL for a
+    # database can add a user to the manager ACL.
+    db['manager_acl'].append('foo_user')
+
+    creds = test_utils.create_credentials(
         self.passkey, self.username, self.nonce, self.nextnonce)
-        """
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({
+          'head':{'method':'put','authorization':creds},
+          'body':db}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to update db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    # Updated the manager ACL
+    db = json['body']
+    self.assertEqual(db['manager_acl'], [self.username, 'foo_user'])
+
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # But, a user who is not a an admin cannot add users to the owner ACL of a
+    # database.
+    db['owner_acl'].append('foo_user')
+
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=simplejson.dumps({
+          'head':{'method':'put','authorization':creds},
+          'body':db}),
+        headers={
+          'User-Agent': 'UA:DCube test :: no permission to update db',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    # Forbidden
+    self.assertEqual(json['head']['status'], 403)
+
