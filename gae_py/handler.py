@@ -180,20 +180,28 @@ def authenticate(dcube_request, db_session, failhard=True):
   # If we made it this far, then everything has gone OK and we return the user.
   return auth_user
 
-def databases_get(db_session, request, dbname):
+def databases_query(db_session, request, db):
+  """Handles DCube "query" method requests to the "/databases/" URL path.
+
+  """
+  user = authenticate(request, db_session)
+  if not db.stored: 
+    # If the database does not exist, we respond with a DCube 404 message.
+    jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db.name)
+
+def databases_get(db_session, request, db):
   """Handles DCube "get" requests to the "/databases/" URL path.
 
   """
-  db = db_session.get(Database, dbname)
   if not db.stored: 
     # If the database does not exist, we respond with a DCube 404 message.
-    jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% dbname)
+    jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db.name)
 
   user = authenticate(request, db_session, failhard=False)
   if user is None:
     # If the user does not exist, we just return the name of this database to
     # indicate that it does indeed exist.
-    jsonrequest.body_out('{"name":"%s"}'% dbname)
+    jsonrequest.body_out('{"name":"%s"}'% db.name)
 
   if not user.authenticated:
     # If the user did not authenticate, we send back the authentication prompt
@@ -218,14 +226,11 @@ def databases_get(db_session, request, dbname):
       creds=[user.username, user.nonce, user.nextnonce],
       body={'name':db.name})
 
-def databases_put(db_session, request, dbname):
+def databases_put(db_session, request, db):
   """Handles DCube put requests to the "/databases/" URL path.
 
   """
   user = authenticate(request, db_session)
-
-  # Get the database type object from the datastore.
-  db = db_session.get(Database, dbname)
   
   if not db.stored: 
     # If the database does not exist, we have to assume that the caller
@@ -315,16 +320,14 @@ def databases_put(db_session, request, dbname):
         'manager_acl': db.manager_acl,
         'user_acl': db.user_acl})
 
-def databases_delete(db_session, request, dbname):
+def databases_delete(db_session, request, db):
   """Handles DCube delete requests to the "/databases/" URL path.
 
   """
-  # Get the database type object from the datastore.
-  db = db_session.get(Database, dbname)
   if not db.stored:
     # If it does not exist, this call gets a DCube 404 response.
     jsonrequest.message_out(404,
-        'Database \\"%s\\" could not be found.'% dbname)
+        'Database \\"%s\\" could not be found.'% db.name)
 
   user = authenticate(request, db_session)
 
@@ -335,9 +338,9 @@ def databases_delete(db_session, request, dbname):
         user.username, user.nonce, user.nextnonce)
 
   # Deleting a database is kind of a big deal, so we log it as such.
-  logging.critical('Removing database "%s".', dbname)
+  logging.critical('Removing database "%s".', db.name)
   db_session.delete(db)
-  jsonrequest.message_out(204, 'Deleted database \\"%s\\".'% dbname)
+  jsonrequest.message_out(204, 'Deleted database \\"%s\\".'% db.name)
 
 def users_get(db_session, dcube_request, user_url, target_user):
   """Handles DCube get requests to the "/users/" URL path.
@@ -470,15 +473,19 @@ def databases_handler(db_session, request):
   # We only support the JSONRequest MIME type for the posted request body.
   dcube_request = jsonrequest.load(request)
 
+  # Get the database type object from the datastore.
+  db = db_session.get(Database, request.path_matches[0])
+
   # Dispatch the request to the proper function, passing in the request type
   # object itself along with the name of the database as it was matched on the
   # reqeust URL path.
   dispatch([
       ('get', databases_get),
       ('put', databases_put),
+      ('query', databases_query),
       ('delete', databases_delete)],
     dcube_request.head['method'],
-    (db_session, dcube_request, request.path_matches[0]))
+    (db_session, dcube_request, db))
 
 @datastore
 def root_handler(db_session, request):
