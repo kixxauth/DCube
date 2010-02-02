@@ -1169,7 +1169,7 @@ class DatabaseManagement(unittest.TestCase):
         url='/databases/'+ self.database,
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: non owner get db',
+          'User-Agent': 'UA:DCube test :: restricted db delete',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -1450,7 +1450,7 @@ class DatabaseManagement(unittest.TestCase):
     # Forbidden
     self.assertEqual(json['head']['status'], 403)
 
-# These tests depend on creation of the test user.
+# These tests depend on creation of the test user and test database.
 class QuerySyntax(unittest.TestCase):
   """ ## Database query syntax. ##
 
@@ -1486,13 +1486,13 @@ class QuerySyntax(unittest.TestCase):
     self.nextnonce = json['head']['authorization'][2]
 
     # Authenticate the test user.
-    username, cnonce, response = test_utils.create_credentials(
+    creds = test_utils.create_credentials(
         self.passkey, self.username, self.nonce, self.nextnonce)
 
     # The correct DCube method to use when querying a database is "query".
     # This method will return a DCube 405 response.
     body = ('{"head":{"method":"foo","authorization":["%s","%s","%s"]}}'%
-        (self.username, cnonce, response))
+        creds)
     response = test_utils.make_http_request(
         method='POST',
         url='/databases/'+ self.database,
@@ -1507,6 +1507,114 @@ class QuerySyntax(unittest.TestCase):
     self.assertEqual(json['head']['status'], 405)
     self.assertEqual(json['head']['message'], 'Allowed:get,put,query,delete')
     self.assertEqual(json['head'].get('authorization'), None)
+
+    # A query can contain as many parts as needed. The query body must must be
+    # a list of parts. So, this query will result in a DCube 400 response.
+    query = '{"not": "valid"}'
+    username, cnonce, response = creds
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+            '"body":%s}'%
+           (username, cnonce, response, query))
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Invalid database query format',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'],
+        'Query body must be a list.')
+    self.assertEqual(json['head']['status'], 400)
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test user.
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # Each part of a query must be a dictionary object. This query will result
+    # in another DCube 400 response.
+    query = '[1,"foo", {}]'
+    username, cnonce, response = creds
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+            '"body":%s}'%
+           (username, cnonce, response, query))
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Invalid database query format',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'],
+        'Query parts must be dictionary objects.')
+    self.assertEqual(json['head']['status'], 400)
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test user.
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # Each query part must have an "action" attribute that is "get" or "put".
+    query = '[{"action":"foo","statements":[]}]'
+    username, cnonce, response = creds
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+            '"body":%s}'%
+           (username, cnonce, response, query))
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Invalid database query format',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'Allowed actions:get,put')
+    self.assertEqual(json['head']['status'], 400)
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test user.
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # Each query part must have a "statements" attribute that is a list.
+    query = '[{"action":"put"}]'
+    username, cnonce, response = creds
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+            '"body":%s}'%
+           (username, cnonce, response, query))
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Invalid database query format',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'Query part statements must be a list.')
+    self.assertEqual(json['head']['status'], 400)
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test user.
+    creds = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
 
   def test_access_list(self):
     """### Test the database user access list. ###

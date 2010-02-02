@@ -91,4 +91,5 @@ class Session(dict):
 
 def commit(session):
   assert isinstance(session, Session)
+  # DEBUG logging.warn("COMMIT %s", repr(session))
   datastore.Put([session[k] for k in session.updates])

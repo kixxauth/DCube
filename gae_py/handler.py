@@ -165,12 +165,18 @@ def authenticate(dcube_request, db_session, failhard=True):
     user.cnonce = None
     user.response = None
 
+  # DEBUG
+  #logging.warn("CNONCE %s", user.cnonce)
+  #logging.warn("RESPONSE %s", user.response)
+  # END DEBUG
+
   # Use the pychap module to authenticate. If the users credentials are updated
   # by pychap it will call store.put_baseuser() which we passed in as the first
   # parameter to pychap.authenticate.  This process ensures that the new CHAP
   # credentials are persisted to disk and ready for the next request made by
   # this user.
   auth_user = pychap.authenticate(db_session.update, user)
+  # DEBUG logging.warn('Auth message: %s', auth_user.message)
   if not auth_user.authenticated:
     # The user did not authenticate, so we return the relevant output message.
     if failhard:
@@ -184,10 +190,46 @@ def databases_query(db_session, request, db):
   """Handles DCube "query" method requests to the "/databases/" URL path.
 
   """
-  user = authenticate(request, db_session)
   if not db.stored: 
     # If the database does not exist, we respond with a DCube 404 message.
     jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db.name)
+
+  # Authenticate the user.
+  user = authenticate(request, db_session)
+
+  if not isinstance(request.body, list):
+    jsonrequest.authorization_out(400, 'Query body must be a list.',
+        user.username, user.nonce, user.nextnonce)
+
+  for part in request.body:
+    if not isinstance(part, dict):
+      jsonrequest.authorization_out(400,
+          'Query parts must be dictionary objects.',
+          user.username, user.nonce, user.nextnonce)
+
+    action = part.get('action')
+    stmts = part.get('statements')
+    if not isinstance(stmts, list):
+      jsonrequest.authorization_out(400,
+          'Query part statements must be a list.',
+          user.username, user.nonce, user.nextnonce)
+
+    if action == 'get':
+      assert False
+
+    elif action == 'put':
+      assert False
+
+    else:
+      # The action for this query part was not "get" or "put".
+      # We only accept "get" or "put", and inform the caller here.
+      action = action is None and 'null' or action
+      jsonrequest.authorization_out(400,
+          'Allowed actions:get,put',
+          user.username, user.nonce, user.nextnonce)
+  # END for part in request.body:
+
+  assert False
 
 def databases_get(db_session, request, db):
   """Handles DCube "get" requests to the "/databases/" URL path.

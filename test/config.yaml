@@ -28,6 +28,10 @@ full:
     - test_create_database
     - test_database_update
 
+  - name: QuerySyntax
+    tests:
+    - test_basic_syntax
+
 # The full set of DCube protocol tests
 protocol:
 - module: protocol
@@ -54,6 +58,10 @@ protocol:
     - test_create_database
     - test_database_update
 
+  - name: QuerySyntax
+    tests:
+    - test_basic_syntax
+
 # Test CHAP authentication.
 authentication:
 - module: protocol
@@ -70,3 +78,19 @@ useraccess:
     tests:
     - test_create_user
     - test_user_access
+
+# Test database query syntax.
+query:
+- module: protocol
+  # The syntax tests need the test user and test database to be created.
+  classes:
+  - name: UserManagement
+    tests:
+    - test_create_user
+  - name: DatabaseManagement
+    tests:
+    - test_create_database
+
+  - name: QuerySyntax
+    tests:
+    - test_basic_syntax
