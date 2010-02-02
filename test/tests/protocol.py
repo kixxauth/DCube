@@ -313,8 +313,37 @@ class Basic(unittest.TestCase):
     self.assertEqual(len(nonce), 40)
     self.assertEqual(len(nextnonce), 40)
 
-    # If we send back a response with invalid cnonce and response, we will be
-    # denied access.
+    # Do it again.
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
+
+    body = '{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+            (ADMIN_USERNAME, cnonce, response)
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Authorized',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200) # Authenticated.
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['authorization'][0], ADMIN_USERNAME)
+    # We got access.
+    self.assertEqual(json['body'], 'DCube host on Google App Engine.')
+
+    # Capture the nonce and nextnonce to authenticate the next request.
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    self.assertEqual(len(nonce), 40)
+    self.assertEqual(len(nextnonce), 40)
+
+    # However, if we send back a response with invalid cnonce and response, we
+    # will be denied access.
     body = '{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
                (ADMIN_USERNAME, 'foostring', 'barstring')
     response = test_utils.make_http_request(
@@ -752,7 +781,7 @@ class UserManagement(unittest.TestCase):
         url='/users/'+ ADMIN_USERNAME,
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: Update user.',
+          'User-Agent': 'UA:DCube test :: update other user.',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -777,7 +806,7 @@ class UserManagement(unittest.TestCase):
         url='/users/'+ self.username,
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: Update user.',
+          'User-Agent': 'UA:DCube test :: cannot delete other user.',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -1084,7 +1113,7 @@ class DatabaseManagement(unittest.TestCase):
     self.assertEqual(db,
          {'name': self.database,
           'owner_acl': [ADMIN_USERNAME],
-          'manager_acl': None,
+          'manager_acl': [],
           'user_acl': None})
 
     # An unauthenticated user can get the database name.

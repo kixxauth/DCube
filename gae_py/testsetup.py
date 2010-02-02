@@ -35,27 +35,28 @@ def main():
 
   logging.critical('/testsetup has been accessed')
 
-  # This is the only handler script where we should ever see this import.
   import store
+  BaseUser = store.BaseUser
+  db = store.Session()
+  user = db.get(BaseUser, TEMP_TEST_USERNAME)
 
   if http_method == 'PUT':
-    user = store.get_baseuser(TEMP_TEST_USERNAME)
-    if user is None:
-      user = type('Proto', (object,),
-          {'username': TEMP_TEST_USERNAME,
-           'groups': [
+    if not user.stored:
+      user.groups = [
              'users',
              'sys_admin',
              'user_admin',
              'account_admin',
-             'database']})()
+             'database']
       import pychap
-      pychap.authenticate(store.put_baseuser, user)
+      pychap.authenticate(db.update, user)
+      store.commit(db)
 
     respond('200 OK', TEMP_TEST_USERNAME)
 
   elif http_method == 'DELETE':
-    store.delete_baseuser(TEMP_TEST_USERNAME)
+    db.delete(user)
+    store.commit(db)
     respond('204 No Content', '')
 
   else:

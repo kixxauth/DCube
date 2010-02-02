@@ -13,7 +13,7 @@ def teardown():
       body=('{"head":{"method":"delete","authorization":["%s"]}}'%
         USERNAME),
       headers={
-        'User-Agent': 'UA:DCube test :: authenticating',
+        'User-Agent': 'UA:DCube teardown :: authenticating testuser',
         'Accept': 'application/jsonrequest',
         'Content-Type': 'application/jsonrequest'})
   assert response.status == 200, 'HTTP status is: %d'% response.status
@@ -37,7 +37,7 @@ def teardown():
       body='{"head":{"method":"delete", "authorization":["%s","%s","%s"]}}'% \
           (username, cnonce, response),
       headers={
-        'User-Agent': 'UA:DCube test :: Get all user data.',
+        'User-Agent': 'UA:DCube teardown :: delete testuser',
         'Accept': 'application/jsonrequest',
         'Content-Type': 'application/jsonrequest'})
   assert response.status == 200
@@ -51,7 +51,7 @@ def teardown():
       body=('{"head":{"method":"delete","authorization":["%s"]}}'%
         test_utils.ADMIN_USERNAME),
       headers={
-        'User-Agent': 'UA:DCube test :: authenticating',
+        'User-Agent': 'UA:DCube teardown :: authenticating admin user',
         'Accept': 'application/jsonrequest',
         'Content-Type': 'application/jsonrequest'})
   assert response.status == 200, 'HTTP status is: %d'% response.status
@@ -76,7 +76,7 @@ def teardown():
       body='{"head":{"method":"delete", "authorization":["%s","%s","%s"]}}'% \
           (username, cnonce, response),
       headers={
-        'User-Agent': 'UA:DCube test :: Get all user data.',
+        'User-Agent': 'UA:DCube teardown :: remove test db.',
         'Accept': 'application/jsonrequest',
         'Content-Type': 'application/jsonrequest'})
   assert response.status == 200

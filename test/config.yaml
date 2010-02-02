@@ -53,3 +53,20 @@ protocol:
     - test_databases_url
     - test_create_database
     - test_database_update
+
+# Test CHAP authentication.
+authentication:
+- module: protocol
+  classes:
+  - name: Basic
+    tests:
+    - test_authenticate
+
+# Test user management access.
+useraccess:
+- module: protocol
+  classes:
+  - name: UserManagement
+    tests:
+    - test_create_user
+    - test_user_access

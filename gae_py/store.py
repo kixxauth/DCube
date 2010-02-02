@@ -7,77 +7,88 @@ from google.appengine.api import datastore_errors
 
 import logging
 
-def get(keys):
-  multiple = isinstance(keys, list) or isinstance(keys, tuple)
-  try:
-    entities = datastore.Get(keys)
-  except datastore_errors.EntityNotFoundError:
-    assert not multiple
-    return None
+class Model(object):
+  def __init__(self, entity, key):
+    self.key = self._prefix + key
+    self.stored = entity.stored
+    for p, default in self._props:
+      try:
+        self.__dict__[p] = entity[p]
+      except KeyError:
+        self.__dict__[p] = default
 
-  return entities
+  @property
+  def dict(self):
+    rv = {}
+    for p, default in self._props:
+      if self.__dict__[p] != default:
+        rv[p] = self.__dict__[p]
+    return rv
 
-class BaseUser(object):
-  kind = 'BaseUser'
-  prefix = 'BaseUser:%s'
+class BaseUser(Model):
+  _prefix = 'BaseUser:'
+  _props = [
+      ('passkey', None),
+      ('nonce', None),
+      ('nextnonce', None),
+      ('groups', ['users'])]
+  def __init__(self, entity, key):
+    self.username = key
+    Model.__init__(self, entity, key)
 
-class Database(object):
-  kind = 'Database'
-  prefix = 'Database:%s'
+class Database(Model):
+  _prefix = 'Database:'
+  _props = [
+      ('owner_acl', []),
+      ('manager_acl', []),
+      ('user_acl', None)]
+  def __init__(self, entity, key):
+    self.name = key
+    Model.__init__(self, entity, key)
 
-def get_baseuser(username):
-  ent = get(datastore.Key.from_path(
-    BaseUser.kind, BaseUser.prefix % username)) 
-
-  if ent is None:
-    return None
-
-  user = BaseUser()
-  user.username = username
-  user.passkey = ent.get('passkey')
-  user.nonce = ent.get('nonce')
-  user.nextnonce = ent.get('nextnonce')
-  user.groups = ent.get('groups')
-  return user
-
-def put_baseuser(user):
-  ent = datastore.Entity(BaseUser.kind, name=BaseUser.prefix % user.username)
-  for k in ['nonce', 'nextnonce', 'passkey', 'groups']:
+class Session(dict):
+  def __init__(self):
+    self.__updates = []
+  def get(self, kind, key):
+    assert kind.__name__ in ['BaseUser', 'Database']
+    kname = kind._prefix + key
     try:
-      ent[k] = getattr(user, k)
-    except AttributeError:
-      user.__dict__[k] = None
-  datastore.Put(ent)
-  return user
+      entity = self[kname]
+    except KeyError:
+      try:
+        entity = datastore.Get(datastore.Key.from_path(kind.__name__, kname))
+        entity.stored = True
+      except datastore_errors.EntityNotFoundError:
+        entity = datastore.Entity(kind.__name__, name=kname)
+        entity.stored = False
+      assert isinstance(entity, dict)
+      self[kname] = entity
+    return kind(entity, key)
 
-def delete_baseuser(username):
-  datastore.Delete(datastore.Key.from_path(
-    BaseUser.kind, BaseUser.prefix % username))
+  def update(self, model):
+    assert isinstance(model, Model)
+    self[model.key].update(model.dict)
+    if model.key not in self.__updates:
+      self.__updates.append(model.key)
+    return model
 
-def get_database(dbname):
-  ent = get(datastore.Key.from_path(
-    Database.kind, Database.prefix % dbname)) 
+  def delete(self, model):
+    assert isinstance(model, Model)
+    datastore.Delete(datastore.Key.from_path(
+      model.__class__.__name__, model.key))
+    del self[model.key]
+    if model.key in self.__updates:
+      self.__updates.remove(model.key)
 
-  if ent is None:
-    return None
+  @property
+  def updates(self):
+    return self.__updates
 
-  db = Database()
-  db.name = dbname
-  db.owner_acl = ent.get('owner_acl')
-  db.manager_acl = ent.get('manager_acl')
-  db.user_acl = ent.get('user_acl')
-  return db
+  def __repr__(self):
+    d = dict(self)
+    rv = '\n<Datastore Session: id:%s,\ndictionary:%s,\n__updates:%s>\n'
+    return rv % (id(self), str(d), str(self.__updates))
 
-def put_database(db):
-  ent = datastore.Entity(Database.kind, name=Database.prefix % db.name)
-  for k in ['owner_acl', 'manager_acl', 'user_acl']:
-    try:
-      ent[k] = getattr(db, k)
-    except AttributeError:
-      db.__dict__[k] = None
-  datastore.Put(ent)
-  return db
-
-def delete_database(dbname):
-  datastore.Delete(datastore.Key.from_path(
-    Database.kind, Database.prefix % dbname))
+def commit(session):
+  assert isinstance(session, Session)
+  datastore.Put([session[k] for k in session.updates])
