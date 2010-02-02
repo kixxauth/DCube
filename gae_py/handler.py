@@ -55,7 +55,7 @@ def datastore(f):
       store.commit(db_session)
   return wrapper
 
-def dispatch(map, request_method, args):
+def dispatch(methodmap, request_method, args):
   """### Call a mapped function determined by the method. ###
 
   Iterates through the given map and calls the requested function, passing it
@@ -73,14 +73,14 @@ def dispatch(map, request_method, args):
   """
   # Expand each tuple in the given map parameter and test it for equality
   # against the given request method.
-  for method, fun in map:
+  for method, fun in methodmap:
     if request_method == method:
       # Call the function in this tuple and return the results if we have a
       # match, terminating this 'for' loop.
       return fun(*args)
 
   # If there was no match, return the invalid method message output.
-  jsonrequest.invalid_method_out(request_method)
+  jsonrequest.invalid_method_out(map(lambda m: m[0], methodmap))
 
 def authenticate(dcube_request, db_session, failhard=True):
   """### Authenticates, updates, and returns a user. ###
@@ -500,7 +500,7 @@ def root_handler(db_session, request):
 
   # We only handle the DCube "get" method on the "/" URL.
   if dcube_request.head['method'] != 'get':
-    jsonrequest.invalid_method_out(dcube_request.head['method'])
+    jsonrequest.invalid_method_out(['get'])
 
   # This URL is authenticated.
   user = authenticate(dcube_request, db_session)

@@ -180,7 +180,7 @@ class Basic(unittest.TestCase):
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
       'head': {'status': 405,
-        'message': 'Invalid method "post".'}})
+        'message': 'Allowed:get'}})
 
   def test_authenticate(self):
     """### Authenticating a user on the root '/' URL ###
@@ -882,9 +882,9 @@ class DatabaseManagement(unittest.TestCase):
 
   """
 
-  # The temporary user that has been created for testing. The teardown module
-  # is called by the testrunner and will remove this user after the tests have
-  # completed.
+  # The temporary user and database that has been created for testing. The
+  # teardown module is called by the testrunner and will remove them after the
+  # tests have completed.
   username = teardown.USERNAME
   passkey = teardown.PASSKEY
   database = teardown.DATABASE
@@ -1450,3 +1450,65 @@ class DatabaseManagement(unittest.TestCase):
     # Forbidden
     self.assertEqual(json['head']['status'], 403)
 
+# These tests depend on creation of the test user.
+class QuerySyntax(unittest.TestCase):
+  """ ## Database query syntax. ##
+
+  """
+
+  # The temporary user and database that has been created for testing. The
+  # teardown module is called by the testrunner and will remove them after the
+  # tests have completed.
+  username = teardown.USERNAME
+  passkey = teardown.PASSKEY
+  database = teardown.DATABASE
+
+  def test_basic_syntax(self):
+    """### The basic syntax for querying a database. ###
+    """
+
+    # An unauthenticated user will not be allowed to query any database.
+    body = '{"head":{"method":"query","authorization":["%s"]}}'% self.username
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Unauthenticated database query',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401)
+    self.assertEqual(json['head']['message'], 'Authenticate.')
+    self.nonce = json['head']['authorization'][1]
+    self.nextnonce = json['head']['authorization'][2]
+
+    # Authenticate the test user.
+    username, cnonce, response = test_utils.create_credentials(
+        self.passkey, self.username, self.nonce, self.nextnonce)
+
+    # The correct DCube method to use when querying a database is "query".
+    # This method will return a DCube 405 response.
+    body = ('{"head":{"method":"foo","authorization":["%s","%s","%s"]}}'%
+        (self.username, cnonce, response))
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Invalid database query method',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 405)
+    self.assertEqual(json['head']['message'], 'Allowed:get,put,query,delete')
+    self.assertEqual(json['head'].get('authorization'), None)
+
+  def test_access_list(self):
+    """### Test the database user access list. ###
+    """
+    pass

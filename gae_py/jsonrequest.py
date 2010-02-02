@@ -69,9 +69,9 @@ def message_out(status, message):
   """Send out the status a message parts of a JSON response."""
   httpout('{"head":{"status":%d,"message":"%s"}}'% (status, message))
 
-def invalid_method_out(method):
+def invalid_method_out(methods):
   """Send out an invalid DCube method response. """
-  message_out(405, 'Invalid method \\"%s\\".'% method)
+  message_out(405, 'Allowed:%s'% ','.join(methods))
 
 def no_user_out(username):
   """Send out a missing DCube user response. """
