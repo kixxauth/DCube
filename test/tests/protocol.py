@@ -937,14 +937,15 @@ class DatabaseManagement(unittest.TestCase):
 
     # Accessing '/databases/' without a database URL results in a DCube 501 "Not
     # implemented." status.
+    body = '{"head":{"method":"get"}}'
     response = test_utils.make_http_request(
         method='POST',
         url='/databases/',
-        body='{"head":{"method":"get"}}',
+        body=body,
         headers={
           'User-Agent': 'UA:DCube test :: /databases/ not implemented',
           'Accept': 'application/jsonrequest',
-          'Content-Length': 0,
+          'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
@@ -1463,6 +1464,72 @@ class QuerySyntax(unittest.TestCase):
   passkey = teardown.PASSKEY
   database = teardown.DATABASE
 
+  def test_setup(self):
+    """### Basic setup procedure for the rest of this class of tests. ###
+    """
+
+    # Authenticate the admin user.
+    body = '{"head":{"method":"get", "authorization":["%s"]}}'% \
+               ADMIN_USERNAME
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate admin user for db setup',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Get the test database
+    body = simplejson.dumps({'head': {'method':'get', 'authorization': creds}})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: get test db for setup',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+
+    # Make the updates to the test database
+    db = json['body']
+    db['manager_acl'] = [] # No managers
+    db['user_acl'] = None # Any users
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    body = simplejson.dumps({'head': {'method':'put', 'authorization': creds},
+                             'body': db})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: update test db for setup',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    db = json['body']
+    self.assertEqual(db['user_acl'], None)
+
   def test_basic_syntax(self):
     """### The basic syntax for querying a database. ###
     """
@@ -1581,7 +1648,7 @@ class QuerySyntax(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
-    self.assertEqual(json['head']['message'], 'Allowed actions:get,put')
+    self.assertEqual(json['head']['message'], 'Allowed actions:get,put,query')
     self.assertEqual(json['head']['status'], 400)
     self.nonce = json['head']['authorization'][1]
     self.nextnonce = json['head']['authorization'][2]
@@ -1612,11 +1679,163 @@ class QuerySyntax(unittest.TestCase):
     self.nonce = json['head']['authorization'][1]
     self.nextnonce = json['head']['authorization'][2]
 
-    # Authenticate the test user.
-    creds = test_utils.create_credentials(
-        self.passkey, self.username, self.nonce, self.nextnonce)
-
   def test_access_list(self):
     """### Test the database user access list. ###
     """
-    pass
+
+    # Update the user access list on the test database.
+    #
+
+    # Authenticate the admin user.
+    body = '{"head":{"method":"get", "authorization":["%s"]}}'% \
+               ADMIN_USERNAME
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate admin user',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Get the test database
+    body = simplejson.dumps({'head': {'method':'get', 'authorization': creds}})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: get test db',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+
+    # Make the updates to the test database
+    db = json['body']
+    db['manager_acl'] = [] # No managers
+    db['user_acl'] = ['chuck_norris'] # Only 1 user
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    body = simplejson.dumps({'head': {'method':'put', 'authorization': creds},
+                             'body': db})
+
+    # Put the update.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: update test db',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    db = json['body']
+    self.assertEqual(db['user_acl'], ['chuck_norris'])
+
+    admin_creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Authenticate the test user
+    body = '{"head":{"method":"get", "authorization":["%s"]}}'% \
+              self.username
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate test user',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # A user who is not on the user access list of a database that is access
+    # list controlled cannot call its query method.
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+            '"body":[]}'%
+           testuser_creds)
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'],
+        'This database is restricted.') # Forbidden.
+    self.assertEqual(json['head']['status'], 403) # Forbidden.
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Make the updates to the test database to add the test user to the acl.
+    db['user_acl'] = [self.username] # Only 1 user
+
+    body = simplejson.dumps({'head': {'method':'put', 'authorization': admin_creds},
+                             'body': db})
+
+    # Put the update.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: update test db',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+    db = json['body']
+    self.assertEqual(db['user_acl'], [self.username])
+
+    # Now that the test user is on the access list, this query will go through.
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+            '"body":[]}'%
+           testuser_creds)
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+

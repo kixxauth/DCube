@@ -196,6 +196,11 @@ def databases_query(db_session, request, db):
 
   # Authenticate the user.
   user = authenticate(request, db_session)
+  
+  if db.user_acl is not None and user.username not in db.user_acl:
+    logging.warn('ACL %s', db.user_acl)
+    jsonrequest.authorization_out(403, 'This database is restricted.',
+        user.username, user.nonce, user.nextnonce)
 
   if not isinstance(request.body, list):
     jsonrequest.authorization_out(400, 'Query body must be a list.',
@@ -220,16 +225,20 @@ def databases_query(db_session, request, db):
     elif action == 'put':
       assert False
 
+    elif action == 'query':
+      assert False
+
     else:
       # The action for this query part was not "get" or "put".
       # We only accept "get" or "put", and inform the caller here.
       action = action is None and 'null' or action
       jsonrequest.authorization_out(400,
-          'Allowed actions:get,put',
+          'Allowed actions:get,put,query',
           user.username, user.nonce, user.nextnonce)
-  # END for part in request.body:
 
-  assert False
+  # END LOOP for part in request.body:
+
+  jsonrequest.out(creds=[user.username, user.nonce, user.nextnonce])
 
 def databases_get(db_session, request, db):
   """Handles DCube "get" requests to the "/databases/" URL path.
@@ -335,12 +344,12 @@ def databases_put(db_session, request, db):
 
   # Last, we check to see if the user is trying to modify the user ACL.
   new_user_acl = request.body.get('user_acl')
-  manager_acl = db.manager_acl or []
-  if isinstance(new_user_acl, list) and new_user_acl != db.user_acl:
+  if (new_user_acl is None or isinstance(new_user_acl, list) and
+      new_user_acl != db.user_acl):
     # The user must be on the owner ACL or the manager ACL, or a member of the
     # "account_admin" permission level group to be able to modify the user ACL.
     if user.username in db.owner_acl or \
-        user.username in manager_acl or \
+        user.username in db.manager_acl or \
         'account_admin' in user.groups:
       db.user_acl = new_user_acl
 
@@ -433,7 +442,6 @@ def users_delete(db_session, dcube_request, user_url, target_user):
 
   # Get the authenticated user.
   auth_user = authenticate(dcube_request, db_session)
-  logging.warn('authenticated deleting user')
 
   # We never alow a user to delete another user.
   if auth_user.username != user_url:

@@ -30,7 +30,9 @@ full:
 
   - name: QuerySyntax
     tests:
+    - test_setup
     - test_basic_syntax
+    - test_access_list
 
 # The full set of DCube protocol tests
 protocol:
@@ -60,7 +62,9 @@ protocol:
 
   - name: QuerySyntax
     tests:
+    - test_setup
     - test_basic_syntax
+    - test_access_list
 
 # Test CHAP authentication.
 authentication:
@@ -93,4 +97,6 @@ query:
 
   - name: QuerySyntax
     tests:
+    - test_setup
     - test_basic_syntax
+    - test_access_list

@@ -13,7 +13,11 @@ class Model(object):
     self.stored = entity.stored
     for p, default in self._props:
       try:
-        self.__dict__[p] = entity[p]
+        if entity[p] is None and isinstance(default, list):
+          # Callers will expect an iterable, not None
+          self.__dict__[p] = []
+        else:
+          self.__dict__[p] = entity[p]
       except KeyError:
         self.__dict__[p] = default
 
@@ -21,7 +25,10 @@ class Model(object):
   def dict(self):
     rv = {}
     for p, default in self._props:
-      if self.__dict__[p] != default:
+      if self.__dict__[p] == []:
+        # Cannot use [] as a property value
+        rv[p] = None
+      else:
         rv[p] = self.__dict__[p]
     return rv
 
