@@ -225,11 +225,23 @@ def databases_query(request, db):
 
     elif action == 'put':
       try:
-        entity = store.put(db.session, db.name, stmts)
+        entity = store.gen_put(db.session, db.name, stmts)
         response_body.append(
             {'action':'put',
               'status':(entity.stored and 200 or 201),
               'key':entity.pub_key})
+      except AssertionError, ae:
+        jsonrequest.authorization_out(400,
+            str(ae),
+            user.username, user.nonce, user.nextnonce)
+
+    elif action == 'delete':
+      try:
+        key = store.gen_delete(db.name, stmts)
+        response_body.append(
+            {'action':'delete',
+              'status':204,
+              'key':key})
       except AssertionError, ae:
         jsonrequest.authorization_out(400,
             str(ae),

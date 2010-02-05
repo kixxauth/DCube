@@ -90,6 +90,9 @@ class GenDat(Model):
   """
   _props = None
   _unindexed = ['textbody']
+  # Todo: The db.TextProperty class has a lot of cruft we don't need, but just
+  # defining it here as a property on this call is a cheap way to get the
+  # functionality we need.
   body = db.TextProperty(name='body', indexed=False)
 
   def __init__(self, session, entity, query):
@@ -107,6 +110,8 @@ class GenDat(Model):
     return rv
 
 class Query(object):
+  _class_prefix = 'GenDat:%s:%s'
+  _key_prefix = 'GenDat:%s'
   key = None
   class_name = ''
   body = None
@@ -129,7 +134,7 @@ class PutQuery(Query):
       if s[0] == 'key':
         self.name = s[2]
       elif s[0] == 'class':
-        self.class_name = 'GenDat:%s:%s'% (db_name, s[2])
+        self.class_name = self._class_prefix % (db_name, s[2])
       elif s[0] == 'entity':
         self.body = s[2]
       else:
@@ -140,7 +145,34 @@ class PutQuery(Query):
     assert isinstance(self.class_name, basestring), \
         'Query put action must declare a class name.'
 
-    self.key = datastore.Key.from_path(self.class_name, 'GenDat:'+ str(self.name))
+    self.key = datastore.Key.from_path(
+        self.class_name, self._key_prefix % str(self.name))
+
+class KeyQuery(Query):
+  def __init__(self, db_name, stmts):
+    self.key = None
+    self.class_name = None
+    self.body = None
+    self.name = ''
+    self.indexes = {}
+
+    for s in stmts:
+      assert isinstance(s, list), \
+          'Query put action statements must be lists.'
+      assert len(s) == 3, \
+          'Query put action statements must contain 3 tokens.'
+      if s[0] == 'key':
+        self.name = s[2]
+      elif s[0] == 'class':
+        self.class_name = self._class_prefix % (db_name, s[2])
+
+    assert isinstance(self.name, basestring) or isinstance(self.name, int), \
+        'Query put action must declare a string or integer key.'
+    assert isinstance(self.class_name, basestring), \
+        'Query put action must declare a class name.'
+
+    self.key = datastore.Key.from_path(
+        self.class_name, self._key_prefix % str(self.name))
 
 class Session(dict):
   def __init__(self):
@@ -233,12 +265,6 @@ def get(session, model, key=None):
     return get_structuredat(session, model, key)
   assert False
 
-def put(session, dbname, query):
-  put_query = PutQuery(dbname, query)
-  model = get(session, put_query)
-  model.body = put_query.body
-  return update(model)
-
 def update(model):
   assert isinstance(model, Model)
   # DEBUG
@@ -251,6 +277,8 @@ def update(model):
 
 def delete(model):
   assert isinstance(model, Model)
+  if not model.stored:
+    return
   datastore.Delete(model.key)
   del model.session[model.key]
   model.session.remove_update(model.key)
@@ -260,4 +288,15 @@ def commit(session):
   # DEBUG
   # logging.warn("COMMIT %s", repr(session))
   datastore.Put([session[k] for k in session.updates])
+
+def gen_put(session, dbname, query):
+  put_query = PutQuery(dbname, query)
+  model = get(session, put_query)
+  model.body = put_query.body
+  return update(model)
+
+def gen_delete(dbname, query):
+  kq = KeyQuery(dbname, query)
+  datastore.Delete(kq.key)
+  return kq.name
 
