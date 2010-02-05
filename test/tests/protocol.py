@@ -1839,3 +1839,62 @@ class QuerySyntax(unittest.TestCase):
     self.assertEqual(json['head']['message'], 'OK')
     self.assertEqual(json['head']['status'], 200)
 
+  def test_query(self):
+    """### Get, Put, and Query data. ###
+
+    """
+
+    # Authenticate the test user
+    body = '{"head":{"method":"get", "authorization":["%s"]}}'% \
+              self.username
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate test user',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Post an entity to the DCube test database.
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+        '"body":[{"action":"put","statements":'
+        '[["class","=","Strings"],["key","=",123],["entity","=","this is some data"]]},'
+        '{"action":"put","statements":'
+        '[["class","=","Strings"],["key","=",456],["entity","=","this is more data"]]}]}'%
+           testuser_creds)
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    ent2 = json['body'][1]
+    self.assertEqual(ent1['action'], 'put')
+    self.assertEqual(ent1['status'], 201)
+    self.assertEqual(ent1['key'], 123)
+    self.assertEqual(ent2['action'], 'put')
+    self.assertEqual(ent2['status'], 201)
+    self.assertEqual(ent2['key'], 456)
+
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])

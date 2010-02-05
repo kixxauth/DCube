@@ -33,6 +33,7 @@ full:
     - test_setup
     - test_basic_syntax
     - test_access_list
+    - test_query
 
 # The full set of DCube protocol tests
 protocol:
@@ -65,6 +66,7 @@ protocol:
     - test_setup
     - test_basic_syntax
     - test_access_list
+    - test_query
 
 # Test CHAP authentication.
 authentication:
@@ -100,3 +102,4 @@ query:
     - test_setup
     - test_basic_syntax
     - test_access_list
+    - test_query

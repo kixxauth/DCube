@@ -28,6 +28,7 @@ SessionStop = http.SessionStop
 
 Database = store.Database
 BaseUser = store.BaseUser
+PutQuery = store.PutQuery
 
 def datastore(f):
   """### Decorator/wrapping function to provide datastore session access. ###
@@ -130,7 +131,7 @@ def authenticate(dcube_request, db_session, failhard=True):
 
   username = auth[0]
   # Get the user from the datastore.
-  user = db_session.get(BaseUser, username)
+  user = store.get(db_session, BaseUser, username)
   if not user.stored: # The user does not exist.
     if failhard:
       jsonrequest.no_user_out(username)
@@ -175,7 +176,7 @@ def authenticate(dcube_request, db_session, failhard=True):
   # parameter to pychap.authenticate.  This process ensures that the new CHAP
   # credentials are persisted to disk and ready for the next request made by
   # this user.
-  auth_user = pychap.authenticate(db_session.update, user)
+  auth_user = pychap.authenticate(store.update, user)
   # DEBUG logging.warn('Auth message: %s', auth_user.message)
   if not auth_user.authenticated:
     # The user did not authenticate, so we return the relevant output message.
@@ -186,7 +187,7 @@ def authenticate(dcube_request, db_session, failhard=True):
   # If we made it this far, then everything has gone OK and we return the user.
   return auth_user
 
-def databases_query(db_session, request, db):
+def databases_query(request, db):
   """Handles DCube "query" method requests to the "/databases/" URL path.
 
   """
@@ -195,10 +196,9 @@ def databases_query(db_session, request, db):
     jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db.name)
 
   # Authenticate the user.
-  user = authenticate(request, db_session)
+  user = authenticate(request, db.session)
   
   if db.user_acl is not None and user.username not in db.user_acl:
-    logging.warn('ACL %s', db.user_acl)
     jsonrequest.authorization_out(403, 'This database is restricted.',
         user.username, user.nonce, user.nextnonce)
 
@@ -206,6 +206,7 @@ def databases_query(db_session, request, db):
     jsonrequest.authorization_out(400, 'Query body must be a list.',
         user.username, user.nonce, user.nextnonce)
 
+  response_body = []
   for part in request.body:
     if not isinstance(part, dict):
       jsonrequest.authorization_out(400,
@@ -223,7 +224,14 @@ def databases_query(db_session, request, db):
       assert False
 
     elif action == 'put':
-      assert False
+      try:
+        entity = store.put(db.session, db.name, stmts)
+        response_body.append(
+            {'action':'put', 'status':201, 'key':entity.pub_key})
+      except AssertionError, ae:
+        jsonrequest.authorization_out(400,
+            str(ae),
+            user.username, user.nonce, user.nextnonce)
 
     elif action == 'query':
       assert False
@@ -237,10 +245,10 @@ def databases_query(db_session, request, db):
           user.username, user.nonce, user.nextnonce)
 
   # END LOOP for part in request.body:
+  jsonrequest.out(creds=[user.username, user.nonce, user.nextnonce],
+      body=response_body)
 
-  jsonrequest.out(creds=[user.username, user.nonce, user.nextnonce])
-
-def databases_get(db_session, request, db):
+def databases_get(request, db):
   """Handles DCube "get" requests to the "/databases/" URL path.
 
   """
@@ -248,7 +256,7 @@ def databases_get(db_session, request, db):
     # If the database does not exist, we respond with a DCube 404 message.
     jsonrequest.message_out(404, 'Database \\"%s\\" could not be found.'% db.name)
 
-  user = authenticate(request, db_session, failhard=False)
+  user = authenticate(request, db.session, failhard=False)
   if user is None:
     # If the user does not exist, we just return the name of this database to
     # indicate that it does indeed exist.
@@ -277,11 +285,11 @@ def databases_get(db_session, request, db):
       creds=[user.username, user.nonce, user.nextnonce],
       body={'name':db.name})
 
-def databases_put(db_session, request, db):
+def databases_put(request, db):
   """Handles DCube put requests to the "/databases/" URL path.
 
   """
-  user = authenticate(request, db_session)
+  user = authenticate(request, db.session)
   
   if not db.stored: 
     # If the database does not exist, we have to assume that the caller
@@ -295,7 +303,7 @@ def databases_put(db_session, request, db):
 
     # Create the new database type object.
     db.owner_acl = [user.username]
-    new_db = db_session.update(db)
+    new_db = store.update(db)
 
     # include it in the DCube response body along with the caller's
     # credentials.
@@ -360,7 +368,7 @@ def databases_put(db_session, request, db):
 
   # Put the changes to disk and return the new database representation to the
   # caller.
-  db_session.update(db)
+  store.update(db)
   jsonrequest.out(200, 'Updated.',
       creds=[user.username,
              user.nonce,
@@ -371,7 +379,7 @@ def databases_put(db_session, request, db):
         'manager_acl': db.manager_acl,
         'user_acl': db.user_acl})
 
-def databases_delete(db_session, request, db):
+def databases_delete(request, db):
   """Handles DCube delete requests to the "/databases/" URL path.
 
   """
@@ -380,7 +388,7 @@ def databases_delete(db_session, request, db):
     jsonrequest.message_out(404,
         'Database \\"%s\\" could not be found.'% db.name)
 
-  user = authenticate(request, db_session)
+  user = authenticate(request, db.session)
 
   # A user must be a sys_admin to delete a database.
   if 'sys_admin' not in user.groups:
@@ -390,10 +398,10 @@ def databases_delete(db_session, request, db):
 
   # Deleting a database is kind of a big deal, so we log it as such.
   logging.critical('Removing database "%s".', db.name)
-  db_session.delete(db)
+  store.delete(db)
   jsonrequest.message_out(204, 'Deleted database \\"%s\\".'% db.name)
 
-def users_get(db_session, dcube_request, user_url, target_user):
+def users_get(dcube_request, user_url, target_user):
   """Handles DCube get requests to the "/users/" URL path.
 
   """
@@ -402,7 +410,7 @@ def users_get(db_session, dcube_request, user_url, target_user):
     jsonrequest.message_out(404,
         'User \\"%s\\" could not be found.'% user_url)
 
-  auth_user = authenticate(dcube_request, db_session, failhard=False)
+  auth_user = authenticate(dcube_request, target_user.session, failhard=False)
   if auth_user is None:
     # If the authenticated user does not exist, we send back a response with
     # limited data about the target user.
@@ -432,7 +440,7 @@ def users_get(db_session, dcube_request, user_url, target_user):
              auth_user.nextnonce],
       body={'username': target_user.username})
 
-def users_delete(db_session, dcube_request, user_url, target_user):
+def users_delete(dcube_request, user_url, target_user):
   """Handles DCube delete requests to the "/users/" URL path.
 
   """
@@ -441,24 +449,24 @@ def users_delete(db_session, dcube_request, user_url, target_user):
     jsonrequest.message_out(404, 'User \\"%s\\" could not be found.'% user_url)
 
   # Get the authenticated user.
-  auth_user = authenticate(dcube_request, db_session)
+  auth_user = authenticate(dcube_request, target_user.session)
 
   # We never alow a user to delete another user.
   if auth_user.username != user_url:
     jsonrequest.authorization_out(403, 'Deleting another user is forbidden.',
         auth_user.username, auth_user.nonce, auth_user.nextnonce)
 
-  db_session.delete(auth_user)
+  store.delete(auth_user)
   jsonrequest.message_out(204, 'Deleted user \\"%s\\".'% user_url)
 
-def users_put(db_session, dcube_request, user_url, target_user):
+def users_put(dcube_request, user_url, target_user):
   """Handles DCube put requests to the "/users/" URL path.
 
   """
   if not target_user.stored:
     # If the use does not exist, we assume the caller intended to create a new
     # one.
-    new_user = pychap.authenticate(db_session.update, target_user)
+    new_user = pychap.authenticate(store.update, target_user)
     jsonrequest.out(status=201, message='Created.',
         creds=[new_user.username,
                new_user.nonce,
@@ -467,7 +475,7 @@ def users_put(db_session, dcube_request, user_url, target_user):
 
   # Otherwise we assume the caller is trying to update this user's data, so we
   # try to authenticate.
-  auth_user = authenticate(dcube_request, db_session)
+  auth_user = authenticate(dcube_request, target_user.session)
 
   # It is wrong to assume that we are existing in a magic poney land where all
   # the planets line up prefectly and our programs are bug free.  In this case,
@@ -502,7 +510,7 @@ def users_put(db_session, dcube_request, user_url, target_user):
       # Else add the user to the group.
       target_user.groups.append(g)
 
-  db_session.update(target_user)
+  store.update(target_user)
   return jsonrequest.out(status=200, message='Updated.',
       creds=[auth_user.username,
              auth_user.nonce,
@@ -524,7 +532,7 @@ def databases_handler(db_session, request):
   dcube_request = jsonrequest.load(request)
 
   # Get the database type object from the datastore.
-  db = db_session.get(Database, request.path_matches[0])
+  db = store.get(db_session, Database, request.path_matches[0])
 
   # Dispatch the request to the proper function, passing in the request type
   # object itself along with the name of the database as it was matched on the
@@ -535,7 +543,7 @@ def databases_handler(db_session, request):
       ('query', databases_query),
       ('delete', databases_delete)],
     dcube_request.head['method'],
-    (db_session, dcube_request, db))
+    (dcube_request, db))
 
 @datastore
 def root_handler(db_session, request):
@@ -574,7 +582,7 @@ def users_handler(db_session, request):
 
   # All the user handler functions need to get the user from the datastore, so
   # we do it here to get it over with.
-  user = db_session.get(BaseUser, request.path_matches[0])
+  user = store.get(db_session, BaseUser, request.path_matches[0])
 
   # Dispatch the method to the correct handler function, passing it the DCube
   # request object, the name of the user as it was given on the requested URL
@@ -584,7 +592,7 @@ def users_handler(db_session, request):
       ('put', users_put),
       ('delete', users_delete)],
     dcube_request.head['method'],
-    (db_session, dcube_request, request.path_matches[0], user))
+    (dcube_request, request.path_matches[0], user))
 
 def robots_handler(request):
   """Handles any request to the "/robots.txt" URL."""

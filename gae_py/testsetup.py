@@ -36,9 +36,8 @@ def main():
   logging.critical('/testsetup has been accessed')
 
   import store
-  BaseUser = store.BaseUser
   db = store.Session()
-  user = db.get(BaseUser, TEMP_TEST_USERNAME)
+  user = store.get(db, store.BaseUser, TEMP_TEST_USERNAME)
 
   if http_method == 'PUT':
     if not user.stored:
@@ -49,13 +48,13 @@ def main():
              'account_admin',
              'database']
       import pychap
-      pychap.authenticate(db.update, user)
+      pychap.authenticate(store.update, user)
       store.commit(db)
 
     respond('200 OK', TEMP_TEST_USERNAME)
 
   elif http_method == 'DELETE':
-    db.delete(user)
+    store.delete(user)
     store.commit(db)
     respond('204 No Content', '')
 
