@@ -98,6 +98,8 @@ class GenDat(Model):
   def __init__(self, session, entity, query):
     self._props = None
     self.body = query.body
+    # DEBUG 
+    # logging.warn('DECLARE_BODY %s', self.body)
     self.__dict__.update(query.indexes)
     Model.__init__(self, session, entity, query.key, query.name)
 
@@ -105,7 +107,7 @@ class GenDat(Model):
   def dict(self):
     rv = {}
     for k in self.__dict__:
-      if k not in ['session','key','stored','_props','_unindexed']:
+      if k not in ['class_name','pub_key','session','key','stored','_props','_unindexed']:
         rv[k] = self.__dict__[k]
     return rv
 
@@ -122,6 +124,7 @@ class PutQuery(Query):
   def __init__(self, db_name, stmts):
     self.key = None
     self.class_name = None
+    self.given_class = None
     self.body = None
     self.name = ''
     self.indexes = {}
@@ -134,6 +137,7 @@ class PutQuery(Query):
       if s[0] == 'key':
         self.name = s[2]
       elif s[0] == 'class':
+        self.given_class = s[2]
         self.class_name = self._class_prefix % (db_name, s[2])
       elif s[0] == 'entity':
         self.body = s[2]
@@ -152,6 +156,7 @@ class KeyQuery(Query):
   def __init__(self, db_name, stmts):
     self.key = None
     self.class_name = None
+    self.given_class = None
     self.body = None
     self.name = ''
     self.indexes = {}
@@ -164,6 +169,7 @@ class KeyQuery(Query):
       if s[0] == 'key':
         self.name = s[2]
       elif s[0] == 'class':
+        self.given_class = s[2]
         self.class_name = self._class_prefix % (db_name, s[2])
 
     assert isinstance(self.name, basestring) or isinstance(self.name, int), \
@@ -250,6 +256,7 @@ def get_gendat(session, query):
     session[query.key] = entity
   model = GenDat(session, entity, query)
   model.body = query.body
+  model.class_name = query.given_class
   return model
 
 def get(session, model, key=None):
@@ -289,14 +296,38 @@ def commit(session):
   # logging.warn("COMMIT %s", repr(session))
   datastore.Put([session[k] for k in session.updates])
 
+def gen_get(dbname, query):
+  kq = KeyQuery(dbname, query)
+  # DEBUG
+  # logging.warn('GET_KEY-KIND %s / %s', kq.key.id_or_name(), kq.key.kind())
+  rv = {
+      'class': kq.given_class,
+      'key': kq.name,
+      'indexes': {},
+      'entity': None,
+      'stored': False}
+  try:
+    entity = datastore.Get(kq.key)
+  except datastore_errors.EntityNotFoundError:
+    return rv
+
+  rv['stored'] = True
+  for k in entity:
+    if k != '_body':
+      rv['indexes'][k.replace('idx:', '')] = entity[k]
+  # DEBUG
+  # logging.warn('BODY %s', entity.get('_body'))
+  rv['entity'] = entity.get('_body')
+  return rv
+
 def gen_put(session, dbname, query):
   put_query = PutQuery(dbname, query)
   model = get(session, put_query)
-  model.body = put_query.body
+  # model.body = put_query.body
   return update(model)
 
 def gen_delete(dbname, query):
   kq = KeyQuery(dbname, query)
   datastore.Delete(kq.key)
-  return kq.name
+  return kq.name, kq.given_class
 

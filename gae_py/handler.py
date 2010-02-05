@@ -221,15 +221,29 @@ def databases_query(request, db):
           user.username, user.nonce, user.nextnonce)
 
     if action == 'get':
-      assert False
+      response_part = {'action': 'get'}
+      try:
+        entity = store.gen_get(db.name, stmts)
+      except AssertionError, ae:
+        jsonrequest.authorization_out(400,
+            str(ae),
+            user.username, user.nonce, user.nextnonce)
+
+      response_body.append({'action': 'get',
+        'status': entity['stored'] and 200 or 404,
+        'class': entity['class'],
+        'key': entity['key'],
+        'indexes': entity['indexes'],
+        'entity': entity['entity']})
 
     elif action == 'put':
       try:
         entity = store.gen_put(db.session, db.name, stmts)
         response_body.append(
             {'action':'put',
-              'status':(entity.stored and 200 or 201),
-              'key':entity.pub_key})
+             'status':(entity.stored and 200 or 201),
+             'class': entity.class_name,
+             'key': entity.pub_key})
       except AssertionError, ae:
         jsonrequest.authorization_out(400,
             str(ae),
@@ -237,11 +251,12 @@ def databases_query(request, db):
 
     elif action == 'delete':
       try:
-        key = store.gen_delete(db.name, stmts)
+        key, klass = store.gen_delete(db.name, stmts)
         response_body.append(
             {'action':'delete',
-              'status':204,
-              'key':key})
+             'status':204,
+             'class': klass,
+             'key':key})
       except AssertionError, ae:
         jsonrequest.authorization_out(400,
             str(ae),

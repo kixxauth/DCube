@@ -1885,7 +1885,7 @@ class QuerySyntax(unittest.TestCase):
         url='/databases/'+ self.database,
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'User-Agent': 'UA:DCube test :: delete entities',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -1897,18 +1897,26 @@ class QuerySyntax(unittest.TestCase):
     ent2 = json['body'][1]
     ent3 = json['body'][2]
     ent4 = json['body'][3]
+
     self.assertEqual(ent1['action'], 'delete')
     self.assertEqual(ent1['status'], 204)
     self.assertEqual(ent1['key'], 'foo@1')
+    self.assertEqual(ent1['class'], '$trings')
+
     self.assertEqual(ent2['action'], 'delete')
     self.assertEqual(ent2['status'], 204)
     self.assertEqual(ent2['key'], 'foo#2')
+    self.assertEqual(ent2['class'], 'json')
+
     self.assertEqual(ent3['action'], 'delete')
     self.assertEqual(ent3['status'], 204)
     self.assertEqual(ent3['key'], 123)
+    self.assertEqual(ent3['class'], 'Strings')
+
     self.assertEqual(ent4['action'], 'delete')
     self.assertEqual(ent4['status'], 204)
     self.assertEqual(ent4['key'], 456)
+    self.assertEqual(ent4['class'], 'Strings')
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
@@ -1927,7 +1935,7 @@ class QuerySyntax(unittest.TestCase):
         url='/databases/'+ self.database,
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'User-Agent': 'UA:DCube test :: put first entities',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -1949,7 +1957,6 @@ class QuerySyntax(unittest.TestCase):
         json['head']['authorization'][1],
         json['head']['authorization'][2])
 
-    # Post two entites with indexes to the DCube test database.
     long_str = ('abcasdi0ouwef;lkjnsdopijhsdfsdfoiusdflkj'
        'df;lknw4r[-90usadv;lknqw4t[09ujasdf;lknqw4tr[09uasd;lknwq4r[09sdf'
        'dsflkj23r-0sdfkj23r-098sdfj23r098234kjsdf0[9u234rsdf09u823rsdf[-09'
@@ -1961,6 +1968,8 @@ class QuerySyntax(unittest.TestCase):
 
     self.assertEqual(len(long_str), 501)
 
+    # Post two new entites and one updated entity with indexes to the DCube
+    # test database.
     part1 = {'action':'put', 'statements':[
       ['key','=','foo@1'],
       ['class','=','$trings'],
@@ -1985,7 +1994,7 @@ class QuerySyntax(unittest.TestCase):
         url='/databases/'+ self.database,
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'User-Agent': 'UA:DCube test :: put new entities',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -1996,15 +2005,93 @@ class QuerySyntax(unittest.TestCase):
     ent1 = json['body'][0]
     ent2 = json['body'][1]
     ent3 = json['body'][2]
+
     self.assertEqual(ent1['action'], 'put')
     self.assertEqual(ent1['status'], 201)
     self.assertEqual(ent1['key'], 'foo@1')
+
     self.assertEqual(ent2['action'], 'put')
     self.assertEqual(ent2['status'], 201)
     self.assertEqual(ent2['key'], 'foo#2')
+
     self.assertEqual(ent3['action'], 'put')
     self.assertEqual(ent3['status'], 200)
     self.assertEqual(ent3['key'], 123)
+
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Get all entities back and try to get one that does not exist.
+    part1 = {'action':'get', 'statements':[
+      ['key','=','foo@1'],
+      ['class','=','$trings']]}
+    part2 = {'action':'get', 'statements':[
+      ['key','=','foo#2'],
+      ['class','=','json']]}
+    part3 = {'action':'get', 'statements':[
+      ['key','=',123],
+      ['class','=','Strings']]}
+    part4 = {'action':'get', 'statements':[
+      ['key','=',456],
+      ['class','=','Strings']]}
+    part5 = {'action':'get', 'statements':[
+      ['key','=',456],
+      ['class','=','diff_class']]}
+    body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
+      'body':[part1, part2, part3, part4, part5]})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: get put entities',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    ent2 = json['body'][1]
+    ent3 = json['body'][2]
+    ent4 = json['body'][3]
+    ent5 = json['body'][4]
+
+    self.assertEqual(ent1['action'], 'get')
+    self.assertEqual(ent1['status'], 200)
+    self.assertEqual(ent1['key'], 'foo@1')
+    self.assertEqual(ent1['class'], '$trings')
+    self.assertEqual(ent1['entity'], '1')
+    self.assertEqual(ent1['indexes'], {'idx':'one'})
+
+    self.assertEqual(ent2['action'], 'get')
+    self.assertEqual(ent2['status'], 200)
+    self.assertEqual(ent2['key'], 'foo#2')
+    self.assertEqual(ent2['class'], 'json')
+    self.assertEqual(ent2['entity'], '{"json":"text","key":123}')
+    self.assertEqual(ent2['indexes'], {'idx':2, 'tags':['#json', 2]})
+
+    self.assertEqual(ent3['action'], 'get')
+    self.assertEqual(ent3['status'], 200)
+    self.assertEqual(ent3['key'], 123)
+    self.assertEqual(ent3['class'], 'Strings')
+    self.assertEqual(ent3['entity'], long_str)
+    self.assertEqual(ent3['indexes'], {'idx':3, 'tags':[1,2,3]})
+
+    self.assertEqual(ent4['action'], 'get')
+    self.assertEqual(ent4['status'], 200)
+    self.assertEqual(ent4['key'], 456)
+    self.assertEqual(ent4['class'], 'Strings')
+    self.assertEqual(ent4['entity'], 'this is more data')
+    self.assertEqual(ent4['indexes'], {})
+
+    self.assertEqual(ent5['action'], 'get')
+    self.assertEqual(ent5['status'], 404)
+    self.assertEqual(ent5['class'], 'diff_class')
+    self.assertEqual(ent5['key'], 456)
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
