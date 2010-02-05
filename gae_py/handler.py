@@ -227,7 +227,9 @@ def databases_query(request, db):
       try:
         entity = store.put(db.session, db.name, stmts)
         response_body.append(
-            {'action':'put', 'status':201, 'key':entity.pub_key})
+            {'action':'put',
+              'status':(entity.stored and 200 or 201),
+              'key':entity.pub_key})
       except AssertionError, ae:
         jsonrequest.authorization_out(400,
             str(ae),

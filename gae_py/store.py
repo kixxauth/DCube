@@ -90,10 +90,13 @@ class GenDat(Model):
   """
   _props = None
   _unindexed = ['textbody']
+  body = db.TextProperty(name='body', indexed=False)
 
-  def __init__(self, session, entity, key, name):
+  def __init__(self, session, entity, query):
     self._props = None
-    Model.__init__(self, session, entity, key, name)
+    self.body = query.body
+    self.__dict__.update(query.indexes)
+    Model.__init__(self, session, entity, query.key, query.name)
 
   @property
   def dict(self):
@@ -108,6 +111,7 @@ class Query(object):
   class_name = ''
   body = None
   name = None
+  indexes = {}
 
 class PutQuery(Query):
   def __init__(self, db_name, stmts):
@@ -115,6 +119,8 @@ class PutQuery(Query):
     self.class_name = None
     self.body = None
     self.name = ''
+    self.indexes = {}
+
     for s in stmts:
       assert isinstance(s, list), \
           'Query put action statements must be lists.'
@@ -122,10 +128,12 @@ class PutQuery(Query):
           'Query put action statements must contain 3 tokens.'
       if s[0] == 'key':
         self.name = s[2]
-      if s[0] == 'class':
+      elif s[0] == 'class':
         self.class_name = 'GenDat:%s:%s'% (db_name, s[2])
-      if s[0] == 'entity':
+      elif s[0] == 'entity':
         self.body = s[2]
+      else:
+        self.indexes['idx:'+ str(s[0])] = s[2]
 
     assert isinstance(self.name, basestring) or isinstance(self.name, int), \
         'Query put action must declare a string or integer key.'
@@ -208,7 +216,7 @@ def get_gendat(session, query):
             unindexed_properties=GenDat._unindexed)
       entity.stored = False
     session[query.key] = entity
-  model = GenDat(session, entity, query.key, query.name)
+  model = GenDat(session, entity, query)
   model.body = query.body
   return model
 
@@ -233,7 +241,8 @@ def put(session, dbname, query):
 
 def update(model):
   assert isinstance(model, Model)
-  logging.warn("DICT %s", repr(model.dict))
+  # DEBUG
+  # logging.warn("DICT %s", repr(model.dict))
   model.session[model.key].update(model.dict)
   model.session.append_update(model.key)
   # DEBUG

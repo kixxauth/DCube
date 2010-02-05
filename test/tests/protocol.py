@@ -1865,7 +1865,7 @@ class QuerySyntax(unittest.TestCase):
         json['head']['authorization'][1],
         json['head']['authorization'][2])
 
-    # Post an entity to the DCube test database.
+    # Post two entities to the DCube test database.
     body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
         '"body":[{"action":"put","statements":'
         '[["class","=","Strings"],["key","=",123],["entity","=","this is some data"]]},'
@@ -1888,11 +1888,73 @@ class QuerySyntax(unittest.TestCase):
     ent1 = json['body'][0]
     ent2 = json['body'][1]
     self.assertEqual(ent1['action'], 'put')
-    self.assertEqual(ent1['status'], 201)
+    assert ent1['status'] >= 200
     self.assertEqual(ent1['key'], 123)
     self.assertEqual(ent2['action'], 'put')
-    self.assertEqual(ent2['status'], 201)
+    assert ent1['status'] >= 200
     self.assertEqual(ent2['key'], 456)
+
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Post two entites with indexes to the DCube test database.
+    long_str = ('abcasdi0ouwef;lkjnsdopijhsdfsdfoiusdflkj'
+       'df;lknw4r[-90usadv;lknqw4t[09ujasdf;lknqw4tr[09uasd;lknwq4r[09sdf'
+       'dsflkj23r-0sdfkj23r-098sdfj23r098234kjsdf0[9u234rsdf09u823rsdf[-09'
+       'dsflkj23r-0sdfkj23r-098sdfj23r098234kjsdf0[9u234rsdf09u823rsdf[-09'
+       'dsflkj23r-0sdfkj23r-098sdfj23r098234kjsdf0[9u234rsdf09u823rsdf[-09'
+       'dsflkj23r-0sdfkj23r-098sdfj23r098234kjsdf0[9u234rsdf09u823rsdf[-09'
+       'dsflkj23r-0sdfkj23r-098sdfj23r098234kjsdf0[9u234rsdf09u823rsdf[-09'
+       'sdf0923rjkhdf09uw34rjkhsf[09u3rjkhsf[09u23rkjhf[09uw3rkjsadf[09usf')
+
+    self.assertEqual(len(long_str), 501)
+
+    part1 = {'action':'put', 'statements':[
+      ['key','=','foo@1'],
+      ['class','=','$trings'],
+      ['entity','=','1'],
+      ['idx','=','one']]}
+    part2 = {'action':'put', 'statements':[
+      ['key','=','foo#2'],
+      ['class','=','json'],
+      ['entity','=','{"json":"text","key":123}'],
+      ['idx','=',2],
+      ['tags','=',['#json',2]]]}
+    part3 = {'action':'put', 'statements':[
+      ['key','=',123],
+      ['class','=','json'],
+      ['entity','=',long_str],
+      ['idx','=',3],
+      ['tags','=',[1,2,3]]]}
+    body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
+      'body':[part1, part2, part3]})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: user not on db acl',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    ent2 = json['body'][1]
+    ent3 = json['body'][2]
+    self.assertEqual(ent1['action'], 'put')
+    assert ent1['status'] >= 200
+    self.assertEqual(ent1['key'], 'foo@1')
+    self.assertEqual(ent2['action'], 'put')
+    assert ent1['status'] >= 200
+    self.assertEqual(ent2['key'], 'foo#2')
+    self.assertEqual(ent3['action'], 'put')
+    assert ent1['status'] >= 200
+    self.assertEqual(ent3['key'], 123)
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
