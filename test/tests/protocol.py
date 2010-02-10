@@ -2143,18 +2143,23 @@ class QuerySyntax(unittest.TestCase):
 
     self.assertEqual(ent6['action'], 'query')
     self.assertEqual(ent6['status'], 200)
-    self.assertEqual(ent6['results'], [{
+    r1 = {
       'class': 'Strings', 'key': '123', #numeric keys are returned as strings
       'entity': long_str,
       'idx': 3,
       'tags': [1,2,3]
-      },{
+      }
+    r2 = {
       'class': 'json', 'key':'foo#2',
       'entity': '{"json":"text","key":123}',
       'idx': 2,
       'tags': ['#json', 2]
-      },{
+      }
+    r3 = {
       'class':'$trings', 'key':'foo@1',
       'entity':'1', 'idx':'one'
-      }])
+      }
+    assert r1 in ent6['results']
+    assert r2 in ent6['results']
+    assert r3 in ent6['results']
 
