@@ -1,6 +1,21 @@
 Release Notes for DCube
 =======================
 
+0.4 Feb 10, 2010
+----------------
+
+- This release marks the first, fully funtional milestone.
+
+- Re-implemented the HTTP handling on top of the GAE provided WebApp framework,
+  which is based on WebOb. The functional programming experiment was going
+  well, but I decided that I would rather have a base line performance metrics
+  measured against the provided framework.  After using the program enough to
+  gain some level of confidence in its correctness, then we can tear apart the
+  framework, looking for optimizations.
+
+- Added full DCube query functionality using the JSONRrequest protocol.
+
+
 0.3 Jan 29, 2010
 ----------------
 

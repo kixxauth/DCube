@@ -16,6 +16,7 @@ import os
 
 import logging
 
+# Used to format date values for HTTP headers.
 from rfc822 import formatdate
 
 from google.appengine.ext import webapp
@@ -32,22 +33,53 @@ BaseUser = store.BaseUser
 GeneralData = store.GeneralData
 
 class StopSession(Exception):
+  """Exception thrown to stop the current request session.
+
+  This Exception class is meant to be subclassed.
+
+  """
+
   def __init__(self, msg):
+    """Constructor for a StopSession exception type.
+    
+    Args:
+      msg: The message meant to output for the request session.
+
+    """
     self.message = msg
 
 class AuthenticationError(StopSession):
+  """Raised when an exception occured while authenticating user credentials.
+
+  """
   status = 401
 
 class Authenticate(StopSession):
+  """Raised when a user needs to send additional credentials."""
   status = 401
   message = 'Authenticate.'
   def __init__(self, *creds):
     self.credentials = creds 
 
 class QuerySyntaxError(StopSession):
+  """For a syntax error in the database query syntax of a request."""
   status = 400
 
 def authenticate(creds):
+  """Take the CHAP credentials of a user and try to authenticate.
+
+  Args:
+    creds: A list of credentials: username, cnonce, response
+  Returns:
+    A list of username, nonce, and nextnonce if the user authenticates.
+
+  Raises:
+    AuthenticationError: If the credentials are invalid.
+    Authenticate: If the credentials are incomplete or the response does not
+    match the stored passkey.
+
+  """
+
   # If the DCube head dictionary does not have an 'authorization' entry, then
   # we asign it an empty list by default. This is to prevent bugs later in
   # the program where a list object is expected.
@@ -109,8 +141,29 @@ def authenticate(creds):
   # credentials..
   return [auth_user.username, auth_user.nonce, auth_user.nextnonce]
 
-def normalize_query_statements(keywords, stmts, query=False):
-  keywords = keywords or []
+def normalize_query_statements(stmts, keywords=[], query=False):
+  """Validate and normalizing database query statements.
+
+  Args:
+    stmts:
+      A list of database query statements. Each statement in the list should
+      itself be a list of 3 elements.
+    keywords:
+      A list of keywords to look for in the given statements.
+    query:
+      A boolean flag to indicate if the return value should be formatted for a
+      query or not. If so, then the index list (the second half of the returned
+      tuple) is formatted to be used with the GAE method Query.filter().
+
+  Returns:
+    A tuple of two items. The first item is a dict of the given keywords, and
+    the second is a list of tuples representing the index properties of the
+    query.
+
+  Raises:
+    AssertionError on invalid query syntax.
+  
+  """
   named_props = {}
   index_list = []
   for s in stmts:
@@ -131,6 +184,14 @@ def normalize_query_statements(keywords, stmts, query=False):
   return (named_props, index_list)
 
 def apply_general_data(dbname):
+  """Return a function that will convert an GeneralData entity to a dictionary.
+
+  The returned function is designed to be used with map() to build a list of
+  valid query results for response output.
+
+  Args:
+    dbname: The name of the database to operate on.
+  """
   def convert_general_data(entity):
     rv = {'key': entity.key_name(dbname), 'entity': entity.text_body}
     for p in entity.dynamic_properties():
@@ -140,6 +201,14 @@ def apply_general_data(dbname):
   return convert_general_data
 
 def apply_query_action(dbname):
+  """Return a function that will execute a query and return the result.
+
+  The returned function is desinged to be used with map() to execute a series
+  of query request parts.
+
+  Args:
+    dbname: The name of the database to operate on.
+  """
   def query_action(part):
     if not isinstance(part, dict):
       raise QuerySyntaxError('Query parts must be dictionary objects.')
@@ -151,7 +220,7 @@ def apply_query_action(dbname):
 
     if action == 'get':
       try:
-        t = normalize_query_statements(['key'], stmts)
+        t = normalize_query_statements(stmts, ['key'])
       except AssertionError, ae:
         # TODO: By raising an exception here, we are telling the client that we
         # aborted ALL the requested operations, when in fact we have only
@@ -181,7 +250,7 @@ def apply_query_action(dbname):
     elif action == 'put':
       try:
         named_props, indexes = normalize_query_statements(
-            ['key','entity'], stmts)
+            stmts, ['key','entity'])
       except AssertionError, ae:
         # TODO: By raising an exception here, we are telling the client that we
         # aborted ALL the requested operations, when in fact we have only
@@ -210,7 +279,7 @@ def apply_query_action(dbname):
 
     elif action == 'delete':
       try:
-        t = normalize_query_statements(['key'], stmts)
+        t = normalize_query_statements(stmts, ['key'])
       except AssertionError, ae:
         # TODO: By raising an exception here, we are telling the client that we
         # aborted ALL the requested operations, when in fact we have only
@@ -235,7 +304,7 @@ def apply_query_action(dbname):
 
     elif action == 'query':
       try:
-        named, clauses = normalize_query_statements(None, stmts, query=True)
+        named, clauses = normalize_query_statements(stmts, query=True)
       except AssertionError, ae:
         # TODO: By raising an exception here, we are telling the client that we
         # aborted ALL the requested operations, when in fact we have only
@@ -268,7 +337,9 @@ def apply_query_action(dbname):
 
 
 class BaseHandler(webapp.RequestHandler):
+  """Simply exists to override the RequestHandler.error() method."""
   def error(self, code):
+    """Catch HTTP 405 codes and set the appropriate 'Allow' header.  """
     if code == 405:
       self.response.set_status(405)
       self.response.headers['allow'] = self._allow
@@ -277,14 +348,24 @@ class BaseHandler(webapp.RequestHandler):
       self.response.clear()
 
 class JsonRequestHandler(BaseHandler):
+  """Dispatch JSONRequests to DCube method specific handlers.
+
+  This handler class should be subclassed by the DCube handler classes.
+
+  This handler only handles the HTTP "POST" method.  It parses and validates
+  the incoming DCube message in JSONRequest format, and then dispatches it to
+  the proper handler.
+  """
   _allow = 'POST'
 
   def errout(self, msg):
+    """Send back an HTTP 400 response."""
     self.response.set_status(400)
     self.response.headers['content-type'] = 'text/plain'
     self.response.out.write(msg)
 
   def httpout(self, body):
+    """Send back an HTTP 200 response."""
     self.response.set_status(200)
     self.response.headers['content-type'] = 'application/jsonrequest'
     self.response.out.write(body)
@@ -312,6 +393,12 @@ class JsonRequestHandler(BaseHandler):
       body=body)))
 
   def post(self, *matches):
+    """Handle the HTTP "POST" method to a URL on this server.
+
+    This dispatcher function automagically handles AuthenticationError and
+    Authenticate type exceptions.
+    
+    """
     # For debugging:
     logging.info('USER_AGENT %s', self.request.user_agent)
     # The "Content-Type" header on the request must be application/jsonrequest.
@@ -348,6 +435,7 @@ class JsonRequestHandler(BaseHandler):
       self.message_out(405, 'Allowed:%s'% ','.join(self.dcube_methods))
       return
     try:
+      # Send the request to the proper handler function.
       if method == 'query':
         self.d3_query(json.get('body'), json['head'].get('authorization'), *matches)
       elif method == 'get':
@@ -357,6 +445,7 @@ class JsonRequestHandler(BaseHandler):
       elif method == 'delete':
         self.d3_delete(json.get('body'), json['head'].get('authorization'), *matches)
       else:
+        # TODO: Handle this exception.
         assert False, 'Method "%s" not implemented.'% method
     except AuthenticationError, auth_e:
       self.message_out(auth_e.status, auth_e.message)
@@ -364,6 +453,7 @@ class JsonRequestHandler(BaseHandler):
       self.authenticate_out(auth.status, auth.message, *auth.credentials)
 
 class DatabasesHandler(JsonRequestHandler):
+  """Handle DCube requests to a "/databases/xyz" URL."""
   dcube_methods = ['get','put','delete','query']
 
   def d3_query(self, request, credentials, match):
@@ -554,6 +644,7 @@ class DatabasesHandler(JsonRequestHandler):
     self.message_out(204, 'Deleted database \\"%s\\".'% db.name)
 
 class RootHandler(JsonRequestHandler):
+  """Handle requests to the root "/" URL."""
   dcube_methods = ['get']
 
   def d3_get(self, request, credentials):
@@ -561,6 +652,7 @@ class RootHandler(JsonRequestHandler):
     self.out(creds=creds, body='DCube host on Google App Engine.')
 
 class UsersHandler(JsonRequestHandler):
+  """Handle DCube requests to a "/users/xyz" URL."""
   dcube_methods = ['get','put','delete']
 
   def d3_get(self, request, credentials, match):
@@ -686,6 +778,7 @@ class UsersHandler(JsonRequestHandler):
     self.message_out(204, 'Deleted user \\"%s\\".'% auth_user.username)
 
 class RobotsHandler(BaseHandler):
+  """Handle requests to the "/robots.txt" URL."""
   _allow = 'GET'
   def get(self):
     self.response.headers['content-type'] = 'text/plain'
@@ -697,6 +790,7 @@ class RobotsHandler(BaseHandler):
     self.response.out.write('User-agent: *\nDisallow: /')
 
 class NotFoundHandler(webapp.RequestHandler):
+  """Handle requests to any URL that is not implemented."""
   def error(self, code):
     self.response.set_status(404)
     self.response.headers['cache-control'] = 'public'

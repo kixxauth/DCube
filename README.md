@@ -1,19 +1,19 @@
 DCube for Google App Engine
 ===========================
 
-DCube is a high level distributed data store that uses the principles of a
-directed descriptive graph in a similar way to the Resource Description
-Framework [(RDF)][1]. This software is a prototype implementation used to
-explore the possibilities of such a data store built upon open web protocols,
-architecture, and technologies like like HTTP and JSON, drawing influence from
-[Representational State Transfer][2], RDF, the semantic web, and related
-concepts.
+DCube is a high level distributed data store that is designed to be implemented
+on platform services like Google App Engine and Amazon Web Services.
 
-In effect, this implementation of DCube just exposes a [JSONRequest][3] API that
-gives users access to Google App Engine distrubuted datastore.
+This software is a prototype implementation used to explore the possibilities
+of such a data store built upon open web protocols, architecture, and
+technologies like like HTTP and JSON, drawing influence from [Representational
+State Transfer][2], RDF, the semantic web, and related concepts.
+
+In effect, this particulary implementation of the DCube concept exposes a
+[JSONRequest][3] API that gives users access to Google App Engine distrubuted
+datastore.
 
 ### This DCube host is implemented in Python on Google App Engine service platform.
-The DCube protocol is defined in the source documentation of `/gae_py/session.py`.
 
 ### DCube is sponsored by [The Fireworks Project](http://www.fireworksproject.com).
 
@@ -24,10 +24,8 @@ The DCube protocol is defined in the source documentation of `/gae_py/session.py
 
 Usage
 -----
-DCube is still several iterations away from real usability. So far the only
-capability available is the creation and removal of user accounts.  The best
-way to start using DCube is to fork this project and and notify the project
-owner, who will help you get set up.
+The best way to start using DCube is to fork this project and and notify the
+project owner, who will help you get set up.
 
 License
 -------
