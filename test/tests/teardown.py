@@ -16,10 +16,13 @@ def teardown():
         'User-Agent': 'UA:DCube teardown :: authenticating testuser',
         'Accept': 'application/jsonrequest',
         'Content-Type': 'application/jsonrequest'})
-  assert response.status == 200, 'HTTP status is: %d'% response.status
+  assert response.status == 200, (
+      'HTTP status is %d when authenticating the temporary test user on '
+      '/users/%s'% (response.status, USERNAME))
   json = simplejson.loads(response.body)
   assert json['head']['status'] == 401 or json['head']['status'] == 404, \
-      'status is %d'% json['head']['status']
+      ('DCube status is %d when authenticating the temporary test user on '
+      '/users/%s'% (json['head']['status'], USERNAME))
 
   if json['head']['status'] == 404:
     return
@@ -54,7 +57,9 @@ def teardown():
         'User-Agent': 'UA:DCube teardown :: authenticating admin user',
         'Accept': 'application/jsonrequest',
         'Content-Type': 'application/jsonrequest'})
-  assert response.status == 200, 'HTTP status is: %d'% response.status
+  assert response.status == 200, (
+      'HTTP status is %d when authenticating the temporary test user on '
+      '/databases/%s'% (response.status, DATABASE))
   json = simplejson.loads(response.body)
   assert json['head']['status'] == 401 or json['head']['status'] == 404, \
       'status is %d'% json['head']['status']

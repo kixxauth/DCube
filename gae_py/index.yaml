@@ -9,3 +9,25 @@ indexes:
 # manually, move them above the marker line.  The index.yaml file is
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
+
+- kind: GeneralData
+  properties:
+  - name: class
+  - name: idx
+
+- kind: GeneralData
+  properties:
+  - name: class
+  - name: tags
+  - name: idx
+
+- kind: GeneralData
+  properties:
+  - name: idx_class
+  - name: idx_idx
+
+- kind: GeneralData
+  properties:
+  - name: idx_class
+  - name: idx_tags
+  - name: idx_idx

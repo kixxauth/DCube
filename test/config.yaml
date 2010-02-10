@@ -5,7 +5,6 @@
 # All tests should go into 'full', which is the default
 full:
 - module: protocol
-  
   classes:
   
   - name: Basic
@@ -35,38 +34,22 @@ full:
     - test_access_list
     - test_query
 
-# The full set of DCube protocol tests
-protocol:
+# Test robots.txt and Not Found response.
+start:
 - module: protocol
-  
   classes:
-  
   - name: Basic
     tests:
     - test_not_found
     - test_robots
+
+# Test the root handler.
+root:
+- module: protocol
+  classes:
+  - name: Basic
+    tests:
     - test_root
-    - test_authenticate
-
-  - name: UserManagement
-    tests:
-    - test_users_url
-    - test_check_user
-    - test_create_user
-    - test_user_access
-
-  - name: DatabaseManagement
-    tests:
-    - test_databases_url
-    - test_create_database
-    - test_database_update
-
-  - name: QuerySyntax
-    tests:
-    - test_setup
-    - test_basic_syntax
-    - test_access_list
-    - test_query
 
 # Test CHAP authentication.
 authentication:
@@ -85,6 +68,19 @@ useraccess:
     - test_create_user
     - test_user_access
 
+# Test database management access.
+dbaccess:
+- module: protocol
+  classes:
+  - name: UserManagement
+    tests:
+    - test_create_user
+  - name: DatabaseManagement
+    tests:
+    - test_databases_url
+    - test_create_database
+    - test_database_update
+
 # Test database query syntax.
 query:
 - module: protocol
@@ -96,6 +92,38 @@ query:
   - name: DatabaseManagement
     tests:
     - test_create_database
+
+  - name: QuerySyntax
+    tests:
+    - test_setup
+    - test_basic_syntax
+    - test_access_list
+    - test_query
+
+# The full set of DCube protocol tests
+protocol:
+- module: protocol
+  classes:
+  
+  - name: Basic
+    tests:
+    - test_not_found
+    - test_robots
+    - test_root
+    - test_authenticate
+
+  - name: UserManagement
+    tests:
+    - test_users_url
+    - test_check_user
+    - test_create_user
+    - test_user_access
+
+  - name: DatabaseManagement
+    tests:
+    - test_databases_url
+    - test_create_database
+    - test_database_update
 
   - name: QuerySyntax
     tests:

@@ -142,9 +142,13 @@ def main():
   suites.run_suites(suites_)
 
   # Teardown insecure user created for testing.
-  teardown.teardown()
+  try:
+    teardown.teardown()
+  except Exception, e:
+    print ''
+    print 'Error in teardown: %s'% e
+    print ''
   # If you remove this bit of functionality, I will shoot you.
-
   if host is localhost:
     # Teardown local sys_admin user.
     cxn = httplib.HTTPConnection(localhost)

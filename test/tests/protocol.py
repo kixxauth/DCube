@@ -763,34 +763,6 @@ class UserManagement(unittest.TestCase):
     user = json['body']
     self.assertEqual(json['body']['username'], ADMIN_USERNAME)
     assert isinstance(user['groups'], list)
-
-    nonce = json['head']['authorization'][1]
-    nextnonce = json['head']['authorization'][2]
-    creds = test_utils.create_credentials(
-        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
-
-    # Add the test admin user to the 'user_admin' group if it is not already.
-    if not 'user_admin' in user['groups']:
-      user['groups'].append('user_admin')
-
-    # Update the test admin user by making a DCube "post" request.
-    body = simplejson.dumps(
-        {'head':{'method':'put','authorization':creds},'body':user})
-    response = test_utils.make_http_request(
-        method='POST',
-        url='/users/'+ ADMIN_USERNAME,
-        body=body,
-        headers={
-          'User-Agent': 'UA:DCube test :: update other user.',
-          'Accept': 'application/jsonrequest',
-          'Content-Length': len(body),
-          'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 200)
-    json = simplejson.loads(response.body)
-    self.assertEqual(json['head']['status'], 200)
-    user = json['body']
-    assert isinstance(user['groups'], list)
-    # The test admin user updated their own data.
     assert 'user_admin' in user['groups'], 'groups: %s'% repr(user['groups'])
 
     nonce = json['head']['authorization'][1]
@@ -865,6 +837,7 @@ class UserManagement(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'Updated.')
     self.assertEqual(json['head']['status'], 200) # Silently fails.
     user = json['body']
     # The "user_admin" group was not added because the "invalid_group" does not
@@ -1023,6 +996,7 @@ class DatabaseManagement(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'Authenticate.')
     self.assertEqual(json['head']['status'], 401)
 
     self.nonce = json['head']['authorization'][1]
@@ -1115,7 +1089,7 @@ class DatabaseManagement(unittest.TestCase):
          {'name': self.database,
           'owner_acl': [ADMIN_USERNAME],
           'manager_acl': [],
-          'user_acl': None})
+          'user_acl': []})
 
     # An unauthenticated user can get the database name.
     body = '{"head":{"method":"get"}}'
@@ -1229,6 +1203,7 @@ class DatabaseManagement(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'Authenticate.')
     self.assertEqual(json['head']['status'], 401)
 
     self.nonce = json['head']['authorization'][1]
@@ -1528,7 +1503,7 @@ class QuerySyntax(unittest.TestCase):
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 200)
     db = json['body']
-    self.assertEqual(db['user_acl'], None)
+    self.assertEqual(db['user_acl'], [])
 
   def test_basic_syntax(self):
     """### The basic syntax for querying a database. ###
@@ -1572,7 +1547,7 @@ class QuerySyntax(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 405)
-    self.assertEqual(json['head']['message'], 'Allowed:get,put,query,delete')
+    self.assertEqual(json['head']['message'], 'Allowed:get,put,delete,query')
     self.assertEqual(json['head'].get('authorization'), None)
 
     # A query can contain as many parts as needed. The query body must must be
@@ -1648,7 +1623,7 @@ class QuerySyntax(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
-    self.assertEqual(json['head']['message'], 'Allowed actions:get,put,query')
+    self.assertEqual(json['head']['message'], 'Allowed actions:get,put,delete,query')
     self.assertEqual(json['head']['status'], 400)
     self.nonce = json['head']['authorization'][1]
     self.nextnonce = json['head']['authorization'][2]
@@ -1674,7 +1649,7 @@ class QuerySyntax(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
-    self.assertEqual(json['head']['message'], 'Query part statements must be a list.')
+    self.assertEqual(json['head']['message'], 'Query part:statements must be a list.')
     self.assertEqual(json['head']['status'], 400)
     self.nonce = json['head']['authorization'][1]
     self.nextnonce = json['head']['authorization'][2]
@@ -1866,6 +1841,7 @@ class QuerySyntax(unittest.TestCase):
         json['head']['authorization'][2])
 
     # Delete the test entities.
+    # The class index will actually be ignored.
     part1 = {'action':'delete', 'statements':[
       ['key','=','foo@1'],
       ['class','=','$trings']]}
@@ -1899,24 +1875,16 @@ class QuerySyntax(unittest.TestCase):
     ent4 = json['body'][3]
 
     self.assertEqual(ent1['action'], 'delete')
-    self.assertEqual(ent1['status'], 204)
     self.assertEqual(ent1['key'], 'foo@1')
-    self.assertEqual(ent1['class'], '$trings')
 
     self.assertEqual(ent2['action'], 'delete')
-    self.assertEqual(ent2['status'], 204)
     self.assertEqual(ent2['key'], 'foo#2')
-    self.assertEqual(ent2['class'], 'json')
 
     self.assertEqual(ent3['action'], 'delete')
-    self.assertEqual(ent3['status'], 204)
     self.assertEqual(ent3['key'], 123)
-    self.assertEqual(ent3['class'], 'Strings')
 
     self.assertEqual(ent4['action'], 'delete')
-    self.assertEqual(ent4['status'], 204)
     self.assertEqual(ent4['key'], 456)
-    self.assertEqual(ent4['class'], 'Strings')
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
@@ -1947,10 +1915,12 @@ class QuerySyntax(unittest.TestCase):
     ent2 = json['body'][1]
     self.assertEqual(ent1['action'], 'put')
     self.assertEqual(ent1['status'], 201)
-    self.assertEqual(ent1['key'], 123)
+    # Numeric keys are returned as strings.
+    self.assertEqual(ent1['key'], '123')
     self.assertEqual(ent2['action'], 'put')
     self.assertEqual(ent2['status'], 201)
-    self.assertEqual(ent2['key'], 456)
+    # Numeric keys are returned as strings.
+    self.assertEqual(ent2['key'], '456')
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
@@ -2016,7 +1986,7 @@ class QuerySyntax(unittest.TestCase):
 
     self.assertEqual(ent3['action'], 'put')
     self.assertEqual(ent3['status'], 200)
-    self.assertEqual(ent3['key'], 123)
+    self.assertEqual(ent3['key'], '123') # Numeric keys are returned as strings.
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
@@ -2037,7 +2007,7 @@ class QuerySyntax(unittest.TestCase):
       ['key','=',456],
       ['class','=','Strings']]}
     part5 = {'action':'get', 'statements':[
-      ['key','=',456],
+      ['key','=',496],
       ['class','=','diff_class']]}
     body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
       'body':[part1, part2, part3, part4, part5]})
@@ -2063,37 +2033,128 @@ class QuerySyntax(unittest.TestCase):
     self.assertEqual(ent1['action'], 'get')
     self.assertEqual(ent1['status'], 200)
     self.assertEqual(ent1['key'], 'foo@1')
-    self.assertEqual(ent1['class'], '$trings')
     self.assertEqual(ent1['entity'], '1')
-    self.assertEqual(ent1['indexes'], {'idx':'one'})
+    self.assertEqual(ent1['indexes'], {'idx':'one','class':'$trings'})
 
     self.assertEqual(ent2['action'], 'get')
     self.assertEqual(ent2['status'], 200)
     self.assertEqual(ent2['key'], 'foo#2')
-    self.assertEqual(ent2['class'], 'json')
     self.assertEqual(ent2['entity'], '{"json":"text","key":123}')
-    self.assertEqual(ent2['indexes'], {'idx':2, 'tags':['#json', 2]})
+    self.assertEqual(ent2['indexes'], {'class':'json','idx':2, 'tags':['#json', 2]})
 
     self.assertEqual(ent3['action'], 'get')
     self.assertEqual(ent3['status'], 200)
-    self.assertEqual(ent3['key'], 123)
-    self.assertEqual(ent3['class'], 'Strings')
+    self.assertEqual(ent3['key'], '123') # Numeric keys are returned as strings.
     self.assertEqual(ent3['entity'], long_str)
-    self.assertEqual(ent3['indexes'], {'idx':3, 'tags':[1,2,3]})
+    self.assertEqual(ent3['indexes'], {'class':'Strings','idx':3, 'tags':[1,2,3]})
 
     self.assertEqual(ent4['action'], 'get')
     self.assertEqual(ent4['status'], 200)
-    self.assertEqual(ent4['key'], 456)
-    self.assertEqual(ent4['class'], 'Strings')
+    self.assertEqual(ent4['key'], '456') # Numeric keys are returned as strings.
     self.assertEqual(ent4['entity'], 'this is more data')
-    self.assertEqual(ent4['indexes'], {})
+    self.assertEqual(ent4['indexes'], {'class':'Strings'})
 
     self.assertEqual(ent5['action'], 'get')
     self.assertEqual(ent5['status'], 404)
-    self.assertEqual(ent5['class'], 'diff_class')
-    self.assertEqual(ent5['key'], 456)
+    self.assertEqual(ent5['key'], '496') # Numeric keys are returned as strings.
 
     testuser_creds = test_utils.create_credentials(
         self.passkey, self.username,
         json['head']['authorization'][1],
         json['head']['authorization'][2])
+
+    # Query for the entities we've put to DCube
+    part1 = {'action':'query', 'statements':[
+      ['class','=','foo_camp']]} # returns nothing
+
+    part2 = {'action':'query', 'statements':[
+      ['class','=','json']]} # returns foo#2
+
+    part3 = {'action':'query', 'statements':[
+      ['class','=','Strings'],
+      ['idx','>',1]]} # returns 123
+
+    part4 = {'action':'query', 'statements':[
+      ['class','=','Strings'],
+      ['tags','=',4]]} # returns nothing
+
+    part5 = {'action':'query', 'statements':[
+      ['class','=','json'],
+      ['idx','<=',3],
+      ['tags','=','#json']]} # returns foo#2
+
+    part6 = {'action':'query', 'statements':[
+      ['idx','>=',2]]} # returns foo#2 and 123
+
+    body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
+      'body':[part1, part2, part3, part4, part5, part6]})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: get put entities',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    ent2 = json['body'][1]
+    ent3 = json['body'][2]
+    ent4 = json['body'][3]
+    ent5 = json['body'][4]
+    ent6 = json['body'][5]
+
+    self.assertEqual(ent1['action'], 'query')
+    self.assertEqual(ent1['status'], 404)
+
+    self.assertEqual(ent2['action'], 'query')
+    self.assertEqual(ent2['status'], 200)
+    self.assertEqual(ent2['results'], [{
+      'class': 'json', 'key':'foo#2',
+      'entity': '{"json":"text","key":123}',
+      'idx': 2,
+      'tags': ['#json', 2]
+      }])
+
+    self.assertEqual(ent3['action'], 'query')
+    self.assertEqual(ent3['status'], 200)
+    self.assertEqual(ent3['results'], [{
+      'class': 'Strings', 'key': '123', #numeric keys are returned as strings
+      'entity': long_str,
+      'idx': 3,
+      'tags': [1,2,3]
+      }])
+
+    self.assertEqual(ent4['action'], 'query')
+    self.assertEqual(ent4['status'], 404)
+
+    self.assertEqual(ent5['action'], 'query')
+    self.assertEqual(ent5['status'], 200)
+    self.assertEqual(ent5['results'], [{
+      'class': 'json', 'key':'foo#2',
+      'entity': '{"json":"text","key":123}',
+      'idx': 2,
+      'tags': ['#json', 2]
+      }])
+
+    self.assertEqual(ent6['action'], 'query')
+    self.assertEqual(ent6['status'], 200)
+    self.assertEqual(ent6['results'], [{
+      'class': 'Strings', 'key': '123', #numeric keys are returned as strings
+      'entity': long_str,
+      'idx': 3,
+      'tags': [1,2,3]
+      },{
+      'class': 'json', 'key':'foo#2',
+      'entity': '{"json":"text","key":123}',
+      'idx': 2,
+      'tags': ['#json', 2]
+      },{
+      'class':'$trings', 'key':'foo@1',
+      'entity':'1', 'idx':'one'
+      }])
+
