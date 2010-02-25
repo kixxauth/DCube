@@ -13,6 +13,7 @@ environment.
 
 import time
 import os
+import re
 
 import logging
 
@@ -395,8 +396,9 @@ class JsonRequestHandler(BaseHandler):
     """
     # For debugging:
     logging.info('USER_AGENT %s', self.request.user_agent)
+
     # The "Content-Type" header on the request must be application/jsonrequest.
-    if self.request.content_type != 'application/jsonrequest':
+    if not re.search('^application/jsonrequest', self.request.content_type):
       self.response.set_status(415)
       return
 

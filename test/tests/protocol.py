@@ -101,7 +101,8 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 415)
     self.assertEqual(response.message, 'Unsupported Media Type')
 
-    # The body of the request must be valid JSON.
+    # The body of the request must be valid JSON, and the Content-Type header
+    # may have extensions.
     body = 'invalid json'
     response = test_utils.make_http_request(
         method='POST',
@@ -111,7 +112,7 @@ class Basic(unittest.TestCase):
           'User-Agent': 'UA:DCube test :: invalid JSON',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
-          'Content-Type': 'application/jsonrequest'})
+          'Content-Type': 'application/jsonrequest; charset=UTF-8'})
     self.assertEqual(response.status, 200)
     # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
