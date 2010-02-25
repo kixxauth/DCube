@@ -112,11 +112,13 @@ class Basic(unittest.TestCase):
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 400)
-    self.assertEqual(response.message, 'Bad Request')
+    self.assertEqual(response.status, 200)
     # TODO: A valid JSON response should be returned instead of plain text.
-    self.assertEqual(response.headers['content-type'], 'text/plain')
-    self.assertEqual(response.body, ('Invalid JSON text body : (invalid json)'))
+    self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 400)
+    self.assertEqual(json['head']['message'],
+        'Invalid JSON text body : (invalid json)')
 
     # The body of the request must be a JSON encoded {} object.
     body = '[1,2,3]'
@@ -129,11 +131,13 @@ class Basic(unittest.TestCase):
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 400)
-    self.assertEqual(response.message, 'Bad Request')
+    self.assertEqual(response.status, 200)
     # TODO: A valid JSON response should be returned instead of plain text.
-    self.assertEqual(response.headers['content-type'], 'text/plain')
-    self.assertEqual(response.body, ('Invalid JSON text body : ([1,2,3])'))
+    self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 400)
+    self.assertEqual(json['head']['message'],
+        'Invalid JSON text body : ([1,2,3])')
 
     # The JSONRequest body must contain a 'head' attribute that is a dictionary.
     body = '{}'
@@ -146,11 +150,13 @@ class Basic(unittest.TestCase):
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 400)
-    self.assertEqual(response.message, 'Bad Request')
+    self.assertEqual(response.status, 200)
     # TODO: A valid JSON response should be returned instead of plain text.
-    self.assertEqual(response.headers['content-type'], 'text/plain')
-    self.assertEqual(response.body, 'Missing DCube message "head" in ({})')
+    self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 400)
+    self.assertEqual(json['head']['message'],
+        'Missing DCube message "head" in ({})')
 
     # The JSONRequest 'head' attribute must contain a 'method' attribute that
     # is is the name of the function to invoke on this url.
@@ -164,10 +170,13 @@ class Basic(unittest.TestCase):
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
-    self.assertEqual(response.status, 400)
-    self.assertEqual(response.message, 'Bad Request')
+    self.assertEqual(response.status, 200)
     # TODO: A valid JSON response should be returned instead of plain text.
-    self.assertEqual(response.body, 'Missing DCube message header "method" in ({"head":{}})')
+    self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 400)
+    self.assertEqual(json['head']['message'],
+        'Missing DCube message header "method" in ({"head":{}})')
 
     # The root '/' url only accepts the 'get' DCube method
     body = '{"head":{"method":"post"}}'
@@ -390,7 +399,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.status, 200)
     self.assertEqual(response.headers['content-type'],
                        'text/plain')
-    # todo: Why are we not getting a content-length header from the server???
+    # TODO: Why are we not getting a content-length header from the server???
     # self.assertEqual(response.headers['content-length'], '25')
     self.assertEqual(response.headers['cache-control'],
                      'public')

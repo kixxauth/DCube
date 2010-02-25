@@ -358,12 +358,6 @@ class JsonRequestHandler(BaseHandler):
   """
   _allow = 'POST'
 
-  def errout(self, msg):
-    """Send back an HTTP 400 response."""
-    self.response.set_status(400)
-    self.response.headers['content-type'] = 'text/plain'
-    self.response.out.write(msg)
-
   def httpout(self, body):
     """Send back an HTTP 200 response."""
     self.response.set_status(200)
@@ -371,7 +365,7 @@ class JsonRequestHandler(BaseHandler):
     self.response.out.write(body)
 
   def message_out(self, status, message):
-    """Send out the status a message parts of a JSON response."""
+    """Send out the status and message parts of a JSON response."""
     self.httpout('{"head":{"status":%d,"message":"%s"}}'% (status, message))
 
   def authenticate_out(self, status, message, username, nonce, nextnonce):
@@ -410,24 +404,24 @@ class JsonRequestHandler(BaseHandler):
     json = None
     try:
       json = simplejson.loads(self.request.body)
-    except: # todo: What error do we want to catch?
-      self.errout('Invalid JSON text body : (%s)'% self.request.body)
+    except: # TODO: What error do we want to catch?
+      self.out(400, 'Invalid JSON text body : (%s)'% self.request.body)
       return
 
     # Only the {} dict object is acceptable as a message payload for the DCube
     # protcol.
     if not isinstance(json, dict):
-      self.errout('Invalid JSON text body : (%s)'% self.request.body)
+      self.out(400, 'Invalid JSON text body : (%s)'% self.request.body)
       return
 
     # The head of the request must be a dictionary.
     if not isinstance(json.get('head'), dict):
-      self.errout('Missing DCube message "head" in (%s)'% self.request.body)
+      self.out(400, 'Missing DCube message "head" in (%s)'% self.request.body)
       return
 
     # The head must contain a method entry.
     if not isinstance(json['head'].get('method'), basestring):
-      self.errout('Missing DCube message header "method" in (%s)'% self.request.body)
+      self.out(400, 'Missing DCube message header "method" in (%s)'% self.request.body)
       return
 
     method = json['head']['method']
