@@ -5,13 +5,14 @@ DCube is a high level distributed data store that is designed to be implemented
 on platform services like Google App Engine and Amazon Web Services.
 
 This software is a prototype implementation used to explore the possibilities
-of such a data store built upon open web protocols, architecture, and
-technologies like like HTTP and JSON, drawing influence from [Representational
-State Transfer][2], RDF, the semantic web, and related concepts.
+of distributed data store functionality. It is built on open web protocols,
+architecture, and technologies like like HTTP and JSON. It draws influence from
+[Representational State Transfer][2], RDF, the semantic web, and some related
+concepts.
 
 In effect, this particulary implementation of the DCube concept exposes a
-[JSONRequest][3] API that gives users access to Google App Engine distrubuted
-datastore.
+[JSONRequest][3] API that gives users access to the Google App Engine
+distrubuted datastore.
 
 ### This DCube host is implemented in Python on Google App Engine service platform.
 

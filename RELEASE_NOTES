@@ -1,6 +1,14 @@
 Release Notes for DCube
 =======================
 
+0.5 FEB 25, 2010
+----------------
+
+- Fixed a couple JSONRequest protocol incompatabilities. This implementation
+  now accepts "application/jsonrequest: extension" style HTTP header notation,
+  and also returns JSONRequest errors as JSON text instead of plain text.
+
+
 0.4 Feb 10, 2010
 ----------------
 
