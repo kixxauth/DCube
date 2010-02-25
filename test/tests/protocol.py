@@ -114,6 +114,7 @@ class Basic(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
+    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'text/plain')
     self.assertEqual(response.body, ('Invalid JSON text body : (invalid json)'))
 
@@ -130,6 +131,7 @@ class Basic(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
+    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'text/plain')
     self.assertEqual(response.body, ('Invalid JSON text body : ([1,2,3])'))
 
@@ -146,6 +148,7 @@ class Basic(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
+    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'text/plain')
     self.assertEqual(response.body, 'Missing DCube message "head" in ({})')
 
@@ -163,6 +166,7 @@ class Basic(unittest.TestCase):
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 400)
     self.assertEqual(response.message, 'Bad Request')
+    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.body, 'Missing DCube message header "method" in ({"head":{}})')
 
     # The root '/' url only accepts the 'get' DCube method
