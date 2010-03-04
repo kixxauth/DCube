@@ -1,6 +1,12 @@
 Release Notes for DCube
 =======================
 
+0.5.1 MAR 4, 2010
+-----------------
+
+- Fixed a bug causing an HTTP 500 server error in the databases/ URL.
+
+
 0.5 FEB 25, 2010
 ----------------
 
