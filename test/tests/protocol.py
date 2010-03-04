@@ -941,10 +941,10 @@ class DatabaseManagement(unittest.TestCase):
     body = '{"head":{"method":"get"}}'
     response = test_utils.make_http_request(
         method='POST',
-        url='/databases/'+ self.database, # The test db should not exist yet.
+        url='/databases/foo',
         body=body,
         headers={
-          'User-Agent': 'UA:DCube test :: user not found',
+          'User-Agent': 'UA:DCube test :: database not found',
           'Accept': 'application/jsonrequest',
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
@@ -952,7 +952,23 @@ class DatabaseManagement(unittest.TestCase):
     json = simplejson.loads(response.body)
     self.assertEqual(json, {
       'head': {'status': 404,
-        'message': 'Database "%s" could not be found.'% self.database}})
+        'message': 'Database "foo" could not be found.'}})
+
+    body = '{"head":{"method":"query"}}'
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/foo',
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: database not found',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json, {
+      'head': {'status': 404,
+        'message': 'Database "foo" could not be found.'}})
 
   def test_create_database(self):
     """### Create a new database. ###

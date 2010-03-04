@@ -461,7 +461,7 @@ class DatabasesHandler(JsonRequestHandler):
     db = Database.get(match)
     if db is None: 
       # If the database does not exist, we respond with a DCube 404 message.
-      return self.message_out(404, 'Database \\"%s\\" could not be found.'% dbname)
+      return self.message_out(404, 'Database \\"%s\\" could not be found.'% match)
 
     # Authenticate the user.
     creds = authenticate(credentials)
