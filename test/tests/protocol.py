@@ -114,7 +114,6 @@ class Basic(unittest.TestCase):
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest; charset=UTF-8'})
     self.assertEqual(response.status, 200)
-    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 400)
@@ -133,7 +132,6 @@ class Basic(unittest.TestCase):
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
-    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 400)
@@ -152,7 +150,6 @@ class Basic(unittest.TestCase):
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
-    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 400)
@@ -172,7 +169,6 @@ class Basic(unittest.TestCase):
           'Content-Length': len(body),
           'Content-Type': 'application/jsonrequest'})
     self.assertEqual(response.status, 200)
-    # TODO: A valid JSON response should be returned instead of plain text.
     self.assertEqual(response.headers['content-type'], 'application/jsonrequest')
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 400)
