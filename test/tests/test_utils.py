@@ -35,7 +35,7 @@ def create_credentials(passkey, username, nonce, nextnonce):
     return hash(key)
 
   def juxt(passkey, seed):
-    return str(passkey) + str(seed)
+    return unicode(passkey) + unicode(seed)
 
   return (username,
       cnonce(juxt(passkey, nextnonce)),
