@@ -1,6 +1,14 @@
 Release Notes for DCube
 =======================
 
+0.5 APR 6, 2010
+---------------
+
+- A bug in the /users/ URL handler prevented an authenticated user with the
+  proper credentials from accessing the full scope of another user object.
+  This is a big enough change in the public HTTP API that it warrents this new
+  minor version number.
+
 0.5.1 MAR 4, 2010
 -----------------
 
