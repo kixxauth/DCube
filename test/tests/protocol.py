@@ -771,9 +771,32 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     user = json['body']
-    self.assertEqual(json['body']['username'], ADMIN_USERNAME)
+    self.assertEqual(user['username'], ADMIN_USERNAME)
     assert isinstance(user['groups'], list)
     assert 'user_admin' in user['groups'], 'groups: %s'% repr(user['groups'])
+
+    nonce = json['head']['authorization'][1]
+    nextnonce = json['head']['authorization'][2]
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME, nonce, nextnonce)
+
+    # Use the test admin user to get the test user.
+    body = '{"head":{"method":"get", "authorization":["%s","%s","%s"]}}'% \
+               (ADMIN_USERNAME, cnonce, response)
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/users/%s'% self.username,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: Auth get test user.',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    user = json['body']
+    self.assertEqual(user['username'], self.username)
+    assert isinstance(user['groups'], list)
 
     nonce = json['head']['authorization'][1]
     nextnonce = json['head']['authorization'][2]

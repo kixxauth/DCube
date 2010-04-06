@@ -676,22 +676,15 @@ class UsersHandler(JsonRequestHandler):
       return self.out(creds=auth.credentials,
           body={'username': target_user.username})
 
-    auth_user = BaseUser(creds[0])
-    logging.warn(auth_user.username)
-    logging.warn(target_user.username)
-    logging.warn(auth_user.groups)
-    logging.warn(auth_user.username == target_user.username)
-    logging.warn('user_admin' in auth_user.groups)
+    auth_user = BaseUser.get(creds[0])
     if auth_user.username == target_user.username or \
         'user_admin' in auth_user.groups:
-      logging.warn('has creds')
       # The user is requesting their own data or the authenticated user is a
       # member of the 'user_admin' group, so we give it all to them.
       return self.out(creds=creds,
           body={'username': target_user.username, 'groups': target_user.groups})
 
     # Limited response for users with restricted permissions.
-    logging.warn('NO creds')
     self.out(creds=creds,
         body={'username': target_user.username})
 
