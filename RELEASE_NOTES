@@ -1,7 +1,7 @@
 Release Notes for DCube
 =======================
 
-0.5 APR 6, 2010
+0.6 APR 6, 2010
 ---------------
 
 - A bug in the /users/ URL handler prevented an authenticated user with the
