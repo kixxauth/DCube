@@ -1,3 +1,13 @@
+"""
+  tests.protocol
+  ~~~~~~~~~~~~~~
+
+  Tests to exercise a DCube server against the DCube HTTP protocol.
+
+  :copyright: (c) 2010 by The Fireworks Project.
+  :license: MIT, see LICENSE for more details.
+"""
+
 import unittest
 
 import simplejson
@@ -10,28 +20,26 @@ ADMIN_USERNAME = test_utils.ADMIN_USERNAME
 PASSKEY = test_utils.ADMIN_PASSKEY
 
 class Basic(unittest.TestCase):
-  """## Define tests to examine basic functionality of this DCube host. ##
+  """Define tests to examine basic functionality of the DCube host server.
 
-  This class of tests works on the default "Not Found" response and the 
+  This class of tests examines the default "Not Found" response and the 
   robots.txt response.
   
-  It also contains tests that work on the root "/" URL to demonstrate the
+  It also contains tests that examine the root "/" URL to demonstrate the
   JSONRequest protocol and DCube message format as well as exercise the
   advanced CHAP authentication scheme.
 
   """
 
   def test_not_found(self):
-    """### Default response for a URL that does not exist. ###
+    """Default response for a URL that does not exist.
 
     If an HTTP request is sent to a URL that does not exist on the DCube host a
     response will still be sent back. The response can be expected to follow
     the specified format for "not found" URLs.
 
     * The response HTTP status will be 404
-
     * The response HTTP message will be "Not Found"
-
     * There will be no message body.
 
     """
@@ -53,17 +61,16 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.body, '') 
 
   def test_root(self):
-    """### Basic HTTP calls to the root "/" url. ###
+    """Basic HTTP calls to the root "/" url.
 
-    The following HTTP calls to the root
-    "http://fireworks-skylight.appspot.com/" url of the DCube api demonstrate
-    the trivial utility it provides.
+    The following HTTP calls to the root http://fireworks-skylight.appspot.com/
+    url of the DCube api demonstrate the trivial utility it provides.
       
       * Like most urls in this protocol, "/" only implements the HTTP "POST"
-      method.
+        method.
 
       * Also, like most urls in this protocol, "/" adheres to the
-      [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
+        `JSONRequest <http://www.json.org/JSONRequest.html>`_ protocol.
 
       * A call to "/" requires CHAP authentication, which makes it the ideal
         place to simply authenticate a user.
@@ -193,15 +200,15 @@ class Basic(unittest.TestCase):
         'message': 'Allowed:get'}})
 
   def test_authenticate(self):
-    """### Authenticating a user on the root '/' URL ###
+    """Authenticating a user on the root '/' URL
 
     The DCube protocol uses a robust challenge-response authentication scheme
     that we call CHAP. It is similar to HTTP digest authentication, but does
     not require the sever to store a plain text password or a long term hashed
     equivalent, but single session hashed password equivalents instead.
 
-    Our scheme is based on the description given by Paul Johnston on his
-    [website](http://pajhome.org.uk/crypt/md5/advancedauth.html#alternative).
+    Our scheme is based on the description given by Paul Johnston 
+    ( http://pajhome.org.uk/crypt/md5/advancedauth.html#alternative ).
     On every request, the password equivalent stored on our servers is updated,
     and never repeated.
 
@@ -379,7 +386,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(json['head']['authorization'][2], nextnonce)
 
   def test_robots(self):
-    """### Test robots.txt request. ###
+    """Test robots.txt request.
 
     DCube also implements a simple robots.txt file for the web crawling bots
     that care to listen.
@@ -417,7 +424,7 @@ class Basic(unittest.TestCase):
     self.assertEqual(response.headers['allow'], 'GET')
 
 class UserManagement(unittest.TestCase):
-  """## Examine the user management functionality of this DCube host. ##
+  """Examine the user management functionality of this DCube host.
 
   This class of tests demonstrates how user management is done on DCube.  All
   user management is done on the "/users/" URL. 
@@ -431,7 +438,7 @@ class UserManagement(unittest.TestCase):
   passkey = teardown.PASSKEY
 
   def test_users_url(self):
-    """### The particularities of the "/users/" URL ###
+    """The particularities of the "/users/" URL
 
     Every user has a unique URI that can be resolved to a full URL. For
     example, "/users/foo_user" implements all the user management for the user
@@ -439,10 +446,10 @@ class UserManagement(unittest.TestCase):
     "http://fireworks-skylight.appspot.com/users/foo_user".
       
       * Like most URLs in this protocol, "/users/" only implements the HTTP "POST"
-      method.
+        method.
 
       * Also, like most urls in this protocol, "/users/" adheres to the
-      [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
+        `JSONRequest <http://www.json.org/JSONRequest.html>`_ protocol.
 
       * The base "/users/" URL is not implemented and will return a DCube 501
         response if it is called.
@@ -513,7 +520,7 @@ class UserManagement(unittest.TestCase):
         'message': 'User "%s" could not be found.'% self.username}})
 
   def test_check_user(self):
-    """### Explore different ways to get user data. ###
+    """Explore different ways to get user data.
 
     The following HTTP calls to "http://fireworks-skylight.appspot.com/users/"
     url of the DCube api demonstrate the the various ways to get user data.
@@ -594,7 +601,7 @@ class UserManagement(unittest.TestCase):
     assert isinstance(user['groups'], list)
 
   def test_create_user(self):
-    """### Create a new user. ###
+    """Create a new user.
 
     A new user can be created by making a DCube "put" request to a "/users/" URL
     that does not yet exist.
@@ -878,7 +885,7 @@ class UserManagement(unittest.TestCase):
     self.assertEqual(user['groups'], ['users'])
 
 class DatabaseManagement(unittest.TestCase):
-  """ ## Database Management ##
+  """Database Management
 
   This class defines a set of tests that demonstrate the database management
   functionality of a DCube host.
@@ -896,7 +903,7 @@ class DatabaseManagement(unittest.TestCase):
   database = teardown.DATABASE
 
   def test_databases_url(self):
-    """### The particularities of the "/databases/" URL ###
+    """The particularities of the "/databases/" URL
 
     Every database has a unique URI that can be resolved to a full URL. For
     example, "/databases/foo_database" implements all the database management
@@ -904,10 +911,10 @@ class DatabaseManagement(unittest.TestCase):
     "http://fireworks-skylight.appspot.com/databases/foo_user".
       
       * Like most URLs in this protocol, "/databases/" only implements the HTTP "POST"
-      method.
+        method.
 
       * Also, like most urls in this protocol, "/databases/" adheres to the
-      [JSONRequest](http://www.json.org/JSONRequest.html) protocol.
+        'JSONRequest <http://www.json.org/JSONRequest.html>`_ protocol.
 
       * The base "/databases/" URL is not implemented and will return a DCube 501
         response if it is called.
@@ -994,7 +1001,7 @@ class DatabaseManagement(unittest.TestCase):
         'message': 'Database "foo" could not be found.'}})
 
   def test_create_database(self):
-    """### Create a new database. ###
+    """Create a new database.
 
     In this test we actually test access methods and permissions of a new
     database after creating it.
@@ -1202,7 +1209,7 @@ class DatabaseManagement(unittest.TestCase):
     self.assertEqual(json['head']['status'], 403)
 
   def test_database_update(self):
-    """### Update a database. ###
+    """Update a database.
 
     This test runs through the various restrictions and permissions when
     updating the metadata for a database.
@@ -1477,10 +1484,11 @@ class DatabaseManagement(unittest.TestCase):
 
 # These tests depend on creation of the test user and test database.
 class QuerySyntax(unittest.TestCase):
-  """ ## Database query syntax. ##
+  """Database query syntax.
+
+  Query a DCube database.
 
   """
-
   # The temporary user and database that has been created for testing. The
   # teardown module is called by the testrunner and will remove them after the
   # tests have completed.
@@ -1489,9 +1497,8 @@ class QuerySyntax(unittest.TestCase):
   database = teardown.DATABASE
 
   def test_setup(self):
-    """### Basic setup procedure for the rest of this class of tests. ###
+    """Setup for the rest of this class of tests.
     """
-
     # Authenticate the admin user.
     body = '{"head":{"method":"get", "authorization":["%s"]}}'% \
                ADMIN_USERNAME
@@ -1555,7 +1562,7 @@ class QuerySyntax(unittest.TestCase):
     self.assertEqual(db['user_acl'], [])
 
   def test_basic_syntax(self):
-    """### The basic syntax for querying a database. ###
+    """The basic syntax for querying a database.
     """
 
     # An unauthenticated user will not be allowed to query any database.
@@ -1865,7 +1872,7 @@ class QuerySyntax(unittest.TestCase):
     self.assertEqual(json['head']['status'], 200)
 
   def test_query(self):
-    """### Get, Put, and Query data. ###
+    """Get, Put, and Query data.
 
     """
 
