@@ -2245,14 +2245,36 @@ class DatabaseIntegrity(unittest.TestCase):
     self.assertEqual(response.status, 200)
     json = simplejson.loads(response.body)
     self.assertEqual(json['head']['status'], 401) # Unauthenticated.
-    username, cnonce, response = test_utils.create_credentials(
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Test admin user adds himself to the user_acl.
+    body = simplejson.dumps({'head':{'method':'put','authorization':creds},
+             'body':{'name':self.database, 'user_acl':[ADMIN_USERNAME]}})
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: add admin user to acl',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 200)
+
+    creds = test_utils.create_credentials(
         PASSKEY, ADMIN_USERNAME,
         json['head']['authorization'][1],
         json['head']['authorization'][2])
 
     # Use the admin user to create the secondary test database.
-    body = '{"head":{"method":"put", "authorization":["%s","%s","%s"]}}'% \
-             (username, cnonce, response)
+    body = '{"head":{"method":"put", "authorization":["%s","%s","%s"]}}'% creds
     response = test_utils.make_http_request(
         method='POST',
         url='/databases/'+ teardown.DATABASE_TOO, # The test db should not exist yet.

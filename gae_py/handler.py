@@ -274,6 +274,7 @@ def apply_query_action(dbname):
       for p, v in indexes:
         setattr(entity, 'idx_'+ str(p), v)
       entity.text_body = body
+      entity.database = dbname
       
       entity.put()
       return part_response
@@ -316,6 +317,7 @@ def apply_query_action(dbname):
       # DEBUG
       # logging.warn('INDEXES %s', clauses)
       query = db.Query(GeneralData)
+      query.filter('database =', dbname)
       for clause, value in clauses:
         query.filter(clause, value)
       results = query.fetch(500)

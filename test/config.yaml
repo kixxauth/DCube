@@ -34,6 +34,10 @@ full:
     - test_access_list
     - test_query
 
+  - name: DatabaseIntegrity
+    tests:
+    - test_logical_separation
+
 # Test robots.txt and Not Found response.
 start:
 - module: protocol
@@ -148,3 +152,7 @@ protocol:
     - test_basic_syntax
     - test_access_list
     - test_query
+
+  - name: DatabaseIntegrity
+    tests:
+    - test_logical_separation

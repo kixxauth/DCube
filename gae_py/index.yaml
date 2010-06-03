@@ -23,6 +23,24 @@ indexes:
 
 - kind: GeneralData
   properties:
+  - name: database
+  - name: idx_class
+  - name: idx_idx
+
+- kind: GeneralData
+  properties:
+  - name: database
+  - name: idx_class
+  - name: idx_tags
+  - name: idx_idx
+
+- kind: GeneralData
+  properties:
+  - name: database
+  - name: idx_idx
+
+- kind: GeneralData
+  properties:
   - name: idx_class
   - name: idx_idx
 

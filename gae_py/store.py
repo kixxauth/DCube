@@ -96,6 +96,7 @@ class GeneralData(db.Expando):
   # their parent Database instances? Useful for local transactions?
   __prefix = 'GeneralData:'
   text_body = db.TextProperty()
+  database = db.StringProperty()
 
   def __init__(self, keys=None, _from_entity=False, **kwds):
     if keys is not None:
