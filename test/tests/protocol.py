@@ -680,7 +680,7 @@ class UserManagement(unittest.TestCase):
 
   # This test must come after test_create_user().
   def test_user_access(self):
-    """### User data access privileges. ###
+    """User data access privileges.
     
       * Any user who is not a member of the privileged "user_admin" group
         cannot get another users data except for the user name.
@@ -2226,8 +2226,6 @@ class DatabaseIntegrity(unittest.TestCase):
   # The temporary user and database that has been created for testing. The
   # teardown module is called by the testrunner and will remove them after the
   # tests have completed.
-  username = teardown.USERNAME
-  passkey = teardown.PASSKEY
   database = teardown.DATABASE
 
   def test_logical_separation(self):
@@ -2271,8 +2269,120 @@ class DatabaseIntegrity(unittest.TestCase):
     self.assertEqual(db['name'], teardown.DATABASE_TOO)
     self.assertEqual(db['owner_acl'], [ADMIN_USERNAME])
 
-    username, cnonce, response = test_utils.create_credentials(
+    creds = test_utils.create_credentials(
         PASSKEY, ADMIN_USERNAME,
         json['head']['authorization'][1],
         json['head']['authorization'][2])
 
+    # Delete previous test entities.
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+      '"body":[{"action":"delete",'
+      '"statements":[["key","=","integrity_1"]]}]}'% creds)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: delete entities',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    self.assertEqual(ent1['action'], 'delete')
+    self.assertEqual(ent1['key'], 'integrity_1')
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+      '"body":[{"action":"delete",'
+      '"statements":[["key","=","integrity_1"]]}]}'% creds)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ teardown.DATABASE_TOO,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: delete entities',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    self.assertEqual(ent1['action'], 'delete')
+    self.assertEqual(ent1['key'], 'integrity_1')
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Post an entity to the primary test database.
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+        '"body":[{"action":"put","statements":'
+        '[["class","=","integrity"],'
+        '["key","=","integrity_1"],'
+        '["entity","=","{data}"]]}]}'% creds)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: put integrity',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    self.assertEqual(ent1['action'], 'put')
+    self.assertEqual(ent1['status'], 201)
+    self.assertEqual(ent1['key'], 'integrity_1')
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Post an entity to the secondary test database.
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+        '"body":[{"action":"put","statements":'
+        '[["class","=","integrity"],'
+        '["key","=","integrity_1"],'
+        '["entity","=","{data}"]]}]}'% creds)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ teardown.DATABASE_TOO,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: put integrity entity',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    self.assertEqual(ent1['action'], 'put')
+    self.assertEqual(ent1['status'], 201)
+    self.assertEqual(ent1['key'], 'integrity_1')
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
