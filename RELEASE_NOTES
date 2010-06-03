@@ -1,6 +1,18 @@
 Release Notes for DCube
 =======================
 
+0.7 June 3, 2010
+----------------
+
+- Fixed a bug that allowed queries in one database to cross into another
+  database.  This condition was obviously really bad for data integrity and the
+  logical separation of the shared datastore.
+
+- Added the ability to do range queries using the `<=>` operator. A range
+  query is kind of like the 'like' query used for partial string matching in
+  relational database systems. In DCube it is `property >= query_param
+  AND property < ufffd` where ufffd is the largest possible unicode character
+
 0.6 APR 6, 2010
 ---------------
 
