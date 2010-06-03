@@ -2330,7 +2330,7 @@ class DatabaseIntegrity(unittest.TestCase):
     # Post an entity to the primary test database.
     body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
         '"body":[{"action":"put","statements":'
-        '[["class","=","integrity"],'
+        '[["common","=","integrity"],'
         '["key","=","integrity_1"],'
         '["entity","=","{data}"]]}]}'% creds)
 
@@ -2360,7 +2360,7 @@ class DatabaseIntegrity(unittest.TestCase):
     # Post an entity to the secondary test database.
     body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
         '"body":[{"action":"put","statements":'
-        '[["class","=","integrity"],'
+        '[["common","=","integrity"],'
         '["key","=","integrity_1"],'
         '["entity","=","{data}"]]}]}'% creds)
 
@@ -2386,3 +2386,51 @@ class DatabaseIntegrity(unittest.TestCase):
         PASSKEY, ADMIN_USERNAME,
         json['head']['authorization'][1],
         json['head']['authorization'][2])
+
+    # Query the primary test DB for the entities we've put to DCube
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+        '"body":[{"action":"query","statements":'
+        '[["common","=","integrity"]]}]}'% creds)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: get put entities',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+
+    self.assertEqual(len(json['body'][0]['results']), 1)
+
+    creds = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Query the secondary test DB for the entities we've put to DCube
+    body = ('{"head":{"method":"query","authorization":["%s","%s","%s"]},'
+        '"body":[{"action":"query","statements":'
+        '[["common","=","integrity"]]}]}'% creds)
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ teardown.DATABASE_TOO,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: get put entities',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+
+    self.assertEqual(len(json['body'][0]['results']), 1)
+

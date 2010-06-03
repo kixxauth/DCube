@@ -325,6 +325,8 @@ def apply_query_action(dbname):
         return part_response
       part_response['status'] = 200
       part_response['results'] = map(apply_general_data(dbname), results)
+      # DEBUG
+      # logging.warn(part_response)
       return part_response
 
     else:
