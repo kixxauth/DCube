@@ -319,7 +319,11 @@ def apply_query_action(dbname):
       query = db.Query(GeneralData)
       query.filter('database =', dbname)
       for clause, value in clauses:
-        query.filter(clause, value)
+        if clause.endswith('<=>'):
+          clause = clause.split(' ')[0]
+          query.filter(clause +' >=', value).filter(clause +' <', u'\ufffd')
+        else:
+          query.filter(clause, value)
       results = query.fetch(500)
       # DEBUG
       # logging.warn('RESULTS %s', results)

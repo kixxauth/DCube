@@ -2219,6 +2219,121 @@ class QuerySyntax(unittest.TestCase):
     assert r2 in ent6['results']
     assert r3 in ent6['results']
 
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Update entities for `range` query.
+    part1 = {'action':'put', 'statements':[
+      ['key','=','foo@1'],
+      ['idx','=','aa']]}
+    part2 = {'action':'put', 'statements':[
+      ['key','=','foo#2'],
+      ['idx','=','ab']]}
+    part3 = {'action':'put', 'statements':[
+      ['key','=',123],
+      ['entity','=','short string'],
+      ['idx','=',3]]}
+    part4 = {'action':'put', 'statements':[
+      ['key','=',456],
+      ['idx','=','AB']]}
+
+    body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
+      'body':[part1, part2, part3, part4]})
+
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: update entities for like test',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+
+    testuser_creds = test_utils.create_credentials(
+        self.passkey, self.username,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Use a `range' query for the entities we've put to DCube
+    part1 = {'action':'query', 'statements':[
+      ['idx','<=>','xa']]} # returns nothing
+
+    part2 = {'action':'query', 'statements':[
+      ['idx','<=>','a']]} # returns foo@1 and foo#2
+
+    part3 = {'action':'query', 'statements':[
+      ['idx','<=>',2]]} # returns 456, foo@1, and foo#2
+
+    part4 = {'action':'query', 'statements':[
+      ['idx','<=>',4]]} # returns 456, foo@1, and foo#2 
+
+    part5 = {'action':'query', 'statements':[
+      ['idx','<=>','ab']]} # returns foo#2
+
+    part6 = {'action':'query', 'statements':[
+      ['idx','<=>','A']]} # returns 456, foo@1, and foo#2
+
+    body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
+      'body':[part1, part2, part3, part4, part5, part6]})
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ self.database,
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: range query',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['message'], 'OK')
+    self.assertEqual(json['head']['status'], 200)
+    ent1 = json['body'][0]
+    ent2 = json['body'][1]
+    ent3 = json['body'][2]
+    ent4 = json['body'][3]
+    ent5 = json['body'][4]
+    ent6 = json['body'][5]
+
+    self.assertEqual(ent1['action'], 'query')
+    self.assertEqual(ent1['status'], 404)
+
+    self.assertEqual(ent2['action'], 'query')
+    self.assertEqual(ent2['status'], 200)
+    assert ent2['results'][0]['key'] in ['foo#2', 'foo@1']
+    assert ent2['results'][1]['key'] in ['foo#2', 'foo@1']
+
+    self.assertEqual(ent3['action'], 'query')
+    self.assertEqual(ent3['status'], 200)
+    self.assertEqual(len(ent3['results']), 4)
+
+    self.assertEqual(ent4['action'], 'query')
+    self.assertEqual(ent4['status'], 200)
+    self.assertEqual(len(ent4['results']), 3)
+    assert ent4['results'][0]['key'] in ['foo#2', 'foo@1', '456']
+    assert ent4['results'][1]['key'] in ['foo#2', 'foo@1', '456']
+    assert ent4['results'][2]['key'] in ['foo#2', 'foo@1', '456']
+
+    self.assertEqual(ent5['action'], 'query')
+    self.assertEqual(ent5['status'], 200)
+    self.assertEqual(len(ent5['results']), 1)
+    self.assertEqual(ent5['results'][0]['key'], 'foo#2')
+
+    self.assertEqual(ent6['action'], 'query')
+    self.assertEqual(ent6['status'], 200)
+    self.assertEqual(len(ent6['results']), 3)
+    assert ent6['results'][0]['key'] in ['foo#2', 'foo@1', '456']
+    assert ent6['results'][1]['key'] in ['foo#2', 'foo@1', '456']
+    assert ent6['results'][2]['key'] in ['foo#2', 'foo@1', '456']
+
 class DatabaseIntegrity(unittest.TestCase):
   """A collection of tests for data integrity within and between databases.
 
