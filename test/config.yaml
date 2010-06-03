@@ -100,6 +100,23 @@ query:
     - test_access_list
     - test_query
 
+# Test database integrity.
+integrity:
+- module: protocol
+  # The integrity tests need the test user and test database to be created.
+  classes:
+  - name: UserManagement
+    tests:
+    - test_create_user
+  - name: DatabaseManagement
+    tests:
+    - test_create_database
+
+  - name: DatabaseIntegrity
+    tests:
+    - test_logical_separation
+
+
 # The full set of DCube protocol tests
 protocol:
 - module: protocol

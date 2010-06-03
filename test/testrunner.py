@@ -146,7 +146,7 @@ def main():
     teardown.teardown()
   except Exception, e:
     print ''
-    print 'Error in teardown: %s'% e
+    print '!Error in teardown: %r'% e
     print ''
   # If you remove this bit of functionality, I will shoot you.
   if host is localhost:

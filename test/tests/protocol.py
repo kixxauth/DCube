@@ -894,7 +894,6 @@ class DatabaseManagement(unittest.TestCase):
   URL.  These tests will create, get, and update database metadata.
 
   """
-
   # The temporary user and database that has been created for testing. The
   # teardown module is called by the testrunner and will remove them after the
   # tests have completed.
@@ -2219,4 +2218,61 @@ class QuerySyntax(unittest.TestCase):
     assert r1 in ent6['results']
     assert r2 in ent6['results']
     assert r3 in ent6['results']
+
+class DatabaseIntegrity(unittest.TestCase):
+  """A collection of tests for data integrity within and between databases.
+
+  """
+  # The temporary user and database that has been created for testing. The
+  # teardown module is called by the testrunner and will remove them after the
+  # tests have completed.
+  username = teardown.USERNAME
+  passkey = teardown.PASSKEY
+  database = teardown.DATABASE
+
+  def test_logical_separation(self):
+    """Confirm logical separation of data between databases.
+
+    """
+    # Authenticate the test admin user.
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/',
+        body='{"head":{"method":"get", "authorization":["%s"]}}'% \
+            ADMIN_USERNAME,
+        headers={
+          'User-Agent': 'UA:DCube test :: authenticate',
+          'Accept': 'application/jsonrequest',
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 401) # Unauthenticated.
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
+
+    # Use the admin user to create the secondary test database.
+    body = '{"head":{"method":"put", "authorization":["%s","%s","%s"]}}'% \
+             (username, cnonce, response)
+    response = test_utils.make_http_request(
+        method='POST',
+        url='/databases/'+ teardown.DATABASE_TOO, # The test db should not exist yet.
+        body=body,
+        headers={
+          'User-Agent': 'UA:DCube test :: create secondary test db',
+          'Accept': 'application/jsonrequest',
+          'Content-Length': len(body),
+          'Content-Type': 'application/jsonrequest'})
+    self.assertEqual(response.status, 200)
+    json = simplejson.loads(response.body)
+    self.assertEqual(json['head']['status'], 201)
+    db = json['body']
+    self.assertEqual(db['name'], teardown.DATABASE_TOO)
+    self.assertEqual(db['owner_acl'], [ADMIN_USERNAME])
+
+    username, cnonce, response = test_utils.create_credentials(
+        PASSKEY, ADMIN_USERNAME,
+        json['head']['authorization'][1],
+        json['head']['authorization'][2])
 
