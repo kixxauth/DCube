@@ -1,11 +1,24 @@
+"""
+  tests.teardown
+  ~~~~~~~~~~~~~~
+
+  Utilities used to teardown databases and users that were created for testing.
+
+  :copyright: (c) 2010 by The Fireworks Project.
+  :license: MIT, see LICENSE for more details.
+"""
+
 import simplejson
 import test_utils
 
 USERNAME = 'test_created_user'
 PASSKEY = 'key'
 DATABASE = 'test_DB'
+DATABASE_TOO = 'test_DB_too'
 
 def teardown():
+  """Teardown databases and users that were created for testing
+  """
   # Authenticate the test user.
   response = test_utils.make_http_request(
       method='POST',
@@ -74,7 +87,7 @@ def teardown():
       test_utils.ADMIN_PASSKEY, test_utils.ADMIN_USERNAME,
       nonce, nextnonce)
 
-  # Remove the test db.
+  # Remove the primary test db.
   response = test_utils.make_http_request(
       method='POST',
       url='/databases/%s'% DATABASE,
@@ -87,3 +100,26 @@ def teardown():
   assert response.status == 200
   json = simplejson.loads(response.body)
   assert json['head']['status'] == 204
+
+  # Re-authenticate.
+  nonce = json['head']['authorization'][1]
+  nextnonce = json['head']['authorization'][2]
+
+  username, cnonce, response = test_utils.create_credentials(
+      test_utils.ADMIN_PASSKEY, test_utils.ADMIN_USERNAME,
+      nonce, nextnonce)
+
+  # Remove the secondary test db.
+  response = test_utils.make_http_request(
+      method='POST',
+      url='/databases/%s'% DATABASE_TOO,
+      body='{"head":{"method":"delete", "authorization":["%s","%s","%s"]}}'% \
+          (username, cnonce, response),
+      headers={
+        'User-Agent': 'UA:DCube teardown :: remove secondary test db.',
+        'Accept': 'application/jsonrequest',
+        'Content-Type': 'application/jsonrequest'})
+  assert response.status == 200
+  json = simplejson.loads(response.body)
+  assert json['head']['status'] == 204
+
