@@ -1,6 +1,17 @@
 Release Notes for DCube
 =======================
 
+0.7.1 June 6, 2010
+------------------
+
+- Discovered that custom index configurations would need to be included in
+  index.yaml for every query that will use the new range filter. This is not
+  acceptable, but fixing it means changing the data models to fit a new scheme,
+  which is just not in the cards at this point.
+
+- Fixed a bug in the new range query type that allowed queries to go unbounded
+  on a property.
+
 0.7 June 3, 2010
 ----------------
 
