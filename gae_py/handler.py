@@ -321,7 +321,12 @@ def apply_query_action(dbname):
       for clause, value in clauses:
         if clause.endswith('<=>'):
           clause = clause.split(' ')[0]
-          query.filter(clause +' >=', value).filter(clause +' <', u'\ufffd')
+          if not isinstance(value, str):
+            value = str(value)
+          bound = (isinstance(value, unicode) and
+              value or unicode(value, errors='replace'))
+          query.filter(clause +' >=', value).filter(
+              clause +' <', (bound + u'\ufffd'))
         else:
           query.filter(clause, value)
       results = query.fetch(500)

@@ -2270,16 +2270,16 @@ class QuerySyntax(unittest.TestCase):
       ['idx','<=>','a']]} # returns foo@1 and foo#2
 
     part3 = {'action':'query', 'statements':[
-      ['idx','<=>',2]]} # returns 456, foo@1, and foo#2
+      ['idx','<=>',2]]} # returns nothing
 
     part4 = {'action':'query', 'statements':[
-      ['idx','<=>',4]]} # returns 456, foo@1, and foo#2 
+      ['idx','<=>',4]]} # returns nothing 
 
     part5 = {'action':'query', 'statements':[
       ['idx','<=>','ab']]} # returns foo#2
 
     part6 = {'action':'query', 'statements':[
-      ['idx','<=>','A']]} # returns 456, foo@1, and foo#2
+      ['idx','<=>','A']]} # returns 456
 
     body = simplejson.dumps({'head':{'method':'query','authorization':testuser_creds},
       'body':[part1, part2, part3, part4, part5, part6]})
@@ -2312,15 +2312,10 @@ class QuerySyntax(unittest.TestCase):
     assert ent2['results'][1]['key'] in ['foo#2', 'foo@1']
 
     self.assertEqual(ent3['action'], 'query')
-    self.assertEqual(ent3['status'], 200)
-    self.assertEqual(len(ent3['results']), 4)
+    self.assertEqual(ent3['status'], 404)
 
     self.assertEqual(ent4['action'], 'query')
-    self.assertEqual(ent4['status'], 200)
-    self.assertEqual(len(ent4['results']), 3)
-    assert ent4['results'][0]['key'] in ['foo#2', 'foo@1', '456']
-    assert ent4['results'][1]['key'] in ['foo#2', 'foo@1', '456']
-    assert ent4['results'][2]['key'] in ['foo#2', 'foo@1', '456']
+    self.assertEqual(ent4['status'], 404)
 
     self.assertEqual(ent5['action'], 'query')
     self.assertEqual(ent5['status'], 200)
@@ -2329,10 +2324,8 @@ class QuerySyntax(unittest.TestCase):
 
     self.assertEqual(ent6['action'], 'query')
     self.assertEqual(ent6['status'], 200)
-    self.assertEqual(len(ent6['results']), 3)
-    assert ent6['results'][0]['key'] in ['foo#2', 'foo@1', '456']
-    assert ent6['results'][1]['key'] in ['foo#2', 'foo@1', '456']
-    assert ent6['results'][2]['key'] in ['foo#2', 'foo@1', '456']
+    self.assertEqual(len(ent6['results']), 1)
+    self.assertEqual(ent6['results'][0]['key'], '456')
 
 class DatabaseIntegrity(unittest.TestCase):
   """A collection of tests for data integrity within and between databases.
